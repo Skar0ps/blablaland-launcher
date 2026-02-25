@@ -1,0 +1,28 @@
+{
+  "name": "blablaland",
+  "version": "1.0.3",
+  "description": "Application Blablaland",
+  "homepage": "",
+  "bugs": {
+    "url": ""
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "license": "MIT",
+  "author": "Blablaland (Seah)",
+  "scripts": {
+    "package": "electron-builder --publish never",
+    "release": "electron-builder --publish always",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.8",
+    "electron-window-state": "^5.0.3"
+  },
+  "devDependencies": {
+    "electron": "^11.5.0",
+    "electron-builder": "^24.13.3"
+  }
+}
