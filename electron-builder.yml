@@ -1,5 +1,5 @@
-appId: "com.blablaland.desktop"
-productName: "Blablaland"
+appId: "com.blablastrae.desktop"
+productName: "Blablastrae"
 
 directories:
   output: "release"
@@ -17,15 +17,10 @@ mac:
   target: "dmg"
 
 win:
-  target:
-    - "nsis"
-    - "portable"
-
-nsis:
-  deleteAppDataOnUninstall: true
+  target: "portable"
 
 linux:
-  target: "deb"
+  target: "AppImage"
 
 protocols:
   - name: "blablaland"

@@ -1,21 +1,31 @@
 {
-  "name": "blablaland",
-  "version": "1.0.3",
-  "description": "Application Blablaland",
-  "homepage": "",
-  "bugs": {
-    "url": ""
-  },
-  "repository": {
-    "type": "git",
-    "url": ""
-  },
-  "license": "MIT",
-  "author": "Blablaland (Seah)",
+  "name": "blablastrae",
+  "version": "1.0.5",
+  "description": "Launcher pour Blablastrae",
+  "homepage": "https://skar0ps.dev",
+  "main": "index.js",
   "scripts": {
     "package": "electron-builder --publish never",
     "release": "electron-builder --publish always",
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.blablastrae.launcher",
+    "productName": "Blablastrae Launcher",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.js",
+      "index.html",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": "portable"  
+    }
   },
   "dependencies": {
     "electron-updater": "^6.1.8",

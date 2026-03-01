@@ -25,6 +25,7 @@ if (!gotTheLock) {
 
     const mainWindow = new BrowserWindow({
       ...mainWindowState,
+      icon: path.join(__dirname, 'assets/icon.ico'),
       show: false,
       autoHideMenuBar: true,
       webPreferences: {
@@ -50,7 +51,7 @@ if (!gotTheLock) {
     });
 
     // Load the URL into the main window
-    mainWindow.loadURL('http://localhost:8000');
+    mainWindow.loadURL('http://blablaland-site.test');
 
     // Manage window state
     mainWindowState.manage(mainWindow);
