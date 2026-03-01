@@ -1,5 +1,4 @@
 const { app, BrowserWindow, Menu, shell, MenuItem } = require('electron');
-const { autoUpdater } = require('electron-updater');
 const windowStateKeeper = require('electron-window-state');
 const path = require('path');
 
@@ -17,6 +16,24 @@ if (!gotTheLock) {
     }
   };
 
+  let splashWindow;
+  let splashStartTime;
+
+  const createSplashWindow = () => {
+    splashStartTime = Date.now();
+    splashWindow = new BrowserWindow({
+      width: 512,
+      height: 512,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      center: true,
+      icon: path.join(__dirname, 'assets/icon.ico'),
+      webPreferences: { devTools: false }
+    });
+    splashWindow.loadFile(path.join(__dirname, 'assets/splash.html'));
+  };
+
   const createWindow = () => {
     const mainWindowState = windowStateKeeper({
       defaultWidth: 1040,
@@ -25,6 +42,7 @@ if (!gotTheLock) {
 
     const mainWindow = new BrowserWindow({
       ...mainWindowState,
+      center: true,
       icon: path.join(__dirname, 'assets/icon.ico'),
       show: false,
       autoHideMenuBar: true,
@@ -36,7 +54,24 @@ if (!gotTheLock) {
     });
 
     // Show the main window when it's ready
-    mainWindow.once('ready-to-show', () => mainWindow.show());
+    mainWindow.once('ready-to-show', () => {
+      const elapsed = Date.now() - splashStartTime;
+      const delay = elapsed >= 1000 ? 0 : 1000 - elapsed;
+
+      setTimeout(() => {
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.webContents.executeJavaScript('document.body.classList.add("fade-out")');
+          setTimeout(() => {
+            if (splashWindow && !splashWindow.isDestroyed()) {
+              splashWindow.destroy();
+            }
+            mainWindow.show();
+          }, 1000);
+        } else {
+          mainWindow.show();
+        }
+      }, delay);
+    });
 
     // Display context menu
     mainWindow.webContents.on('context-menu', (event, params) => {
@@ -98,8 +133,8 @@ if (!gotTheLock) {
 
   app.whenReady().then(() => {
     createMenu();
+    createSplashWindow();
     createWindow();
-    autoUpdater.checkForUpdates();
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
