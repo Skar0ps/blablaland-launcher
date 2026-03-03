@@ -1,17 +1,16 @@
 {
   "name": "blablastrae",
   "version": "1.0.5",
+  "productName": "Blablastrae",
   "description": "Launcher pour Blablastrae",
   "homepage": "https://skar0ps.dev",
   "main": "index.js",
+  "author": "Skar0ps",
   "scripts": {
     "package": "electron-builder --publish never",
     "release": "electron-builder --publish always",
     "start": "electron .",
-    "dist": "electron-builder --win portable"
-  },
-  "dependencies": {
-    "electron-window-state": "^5.0.3"
+    "dist": "electron-builder --win"
   },
   "devDependencies": {
     "electron": "^11.5.0",

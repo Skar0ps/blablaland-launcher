@@ -1,5 +1,8 @@
 appId: "com.blablastrae.desktop"
-productName: "Blablastrae"
+
+# Optimisation : Ne garder que les fichiers de langue française (gagne ~3-5 Mo)
+electronLanguages:
+  - fr
 
 directories:
   output: "release"
@@ -22,11 +25,14 @@ extraResources:
       - "**/*"
 
 mac:
-  target: "dmg"
+  target:
+    - "dmg"
+    - "zip"
 
 win:
   target: "portable"
   icon: "assets/icon.ico"
+  arch: "x64" # Optimisation : Forcer le 64 bits uniquement (évite le code 32 bits inutile)
 
 linux:
   target: "AppImage"

@@ -1,6 +1,10 @@
 const { app, BrowserWindow, Menu, shell, MenuItem } = require('electron');
-const windowStateKeeper = require('electron-window-state');
 const path = require('path');
+
+// --- Configuration ---
+const GAME_URL = 'http://blablaland-site.test'; // TODO: Remplacer par l'URL de production
+const GAME_ORIGIN = new URL(GAME_URL).origin;
+// ---------------------
 
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -8,12 +12,8 @@ if (!gotTheLock) {
   app.quit();
 } else {
   const createMenu = () => {
-    const menu = Menu.getApplicationMenu();
-    const viewMenu = menu.items.find(item => item.role === 'viewmenu');
-    if (viewMenu) {
-      const filteredItems = viewMenu.submenu.items;
-      Menu.setApplicationMenu(Menu.buildFromTemplate(filteredItems));
-    }
+    // Optimisation : Pas de menu natif (gain de place et de mémoire)
+    Menu.setApplicationMenu(null);
   };
 
   let splashWindow;
@@ -35,13 +35,9 @@ if (!gotTheLock) {
   };
 
   const createWindow = () => {
-    const mainWindowState = windowStateKeeper({
-      defaultWidth: 1040,
-      defaultHeight: 730,
-    });
-
     const mainWindow = new BrowserWindow({
-      ...mainWindowState,
+      width: 1040,
+      height: 730,
       center: true,
       icon: path.join(__dirname, 'assets/icon.ico'),
       show: false,
@@ -49,14 +45,18 @@ if (!gotTheLock) {
       webPreferences: {
         contextIsolation: true,
         plugins: true,
-        devTools: false
+        devTools: false,
+        nodeIntegration: false,
+        enableRemoteModule: false,
+        safeDialogs: true
       },
     });
 
     // Show the main window when it's ready
     mainWindow.once('ready-to-show', () => {
       const elapsed = Date.now() - splashStartTime;
-      const delay = elapsed >= 1000 ? 0 : 1000 - elapsed;
+      const minSplashDuration = 1500; // 1.5s pour laisser l'animation se terminer
+      const delay = elapsed >= minSplashDuration ? 0 : minSplashDuration - elapsed;
 
       setTimeout(() => {
         if (splashWindow && !splashWindow.isDestroyed()) {
@@ -66,7 +66,7 @@ if (!gotTheLock) {
               splashWindow.destroy();
             }
             mainWindow.show();
-          }, 1000);
+          }, 500);
         } else {
           mainWindow.show();
         }
@@ -85,11 +85,41 @@ if (!gotTheLock) {
       contextMenu.popup(mainWindow, params.x, params.y);
     });
 
-    // Load the URL into the main window
-    mainWindow.loadURL('http://blablaland-site.test');
+    // Sécurité : Intercepter et définir la Content Security Policy (CSP)
+    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [
+            `default-src 'self' ${GAME_ORIGIN} data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' ${GAME_ORIGIN}; object-src 'self' 'unsafe-inline' 'unsafe-eval' ${GAME_ORIGIN}; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; connect-src *;`
+          ]
+        }
+      });
+    });
 
-    // Manage window state
-    mainWindowState.manage(mainWindow);
+    // Sécurité : Bloquer les demandes de permissions (caméra, micro, notifications, etc.)
+    mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+      callback(false);
+    });
+
+    // Sécurité : Empêcher la navigation vers des sites tiers
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.origin !== GAME_ORIGIN) {
+        event.preventDefault();
+      }
+    });
+
+    // Sécurité : Gérer l'ouverture de nouvelles fenêtres (bloquer ou ouvrir dans le navigateur par défaut)
+    mainWindow.webContents.on('new-window', (event, url) => {
+      event.preventDefault();
+      if (url.startsWith('http')) {
+        shell.openExternal(url);
+      }
+    });
+
+    // Load the URL into the main window
+    mainWindow.loadURL(GAME_URL);
   };
 
   const initializeFlashPlugin = () => {
