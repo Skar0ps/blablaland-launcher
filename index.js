@@ -11,6 +11,12 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
+  // --- Optimisations de performance ---
+  // Désactive l'accélération matérielle. Peut améliorer les performances sur les PC
+  // très bas de gamme ou avec des pilotes graphiques instables, au détriment d'animations
+  // potentiellement moins fluides dans l'interface web (n'affecte pas Flash directement).
+  app.disableHardwareAcceleration();
+
   const createMenu = () => {
     // Optimisation : Pas de menu natif (gain de place et de mémoire)
     Menu.setApplicationMenu(null);
