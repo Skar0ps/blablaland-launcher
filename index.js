@@ -25,7 +25,7 @@ if (!gotTheLock) {
   let splashWindow;
   let splashStartTime;
 
-  let test;
+  // let test;
 
   const createSplashWindow = () => {
     splashStartTime = Date.now();
