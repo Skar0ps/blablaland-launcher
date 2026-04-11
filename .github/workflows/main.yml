@@ -6,6 +6,9 @@ on:
     tags:
       - 'v[0-9]+.*'
 
+permissions:
+  contents: write
+
 jobs:
   build_windows_linux:
     name: Build for Windows & Linux
@@ -21,9 +24,7 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build Windows (NSIS + Portable) & Linux (AppImage + deb + rpm)
-        run: yarn release --win --linux
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: yarn package --win --linux
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v5
@@ -51,16 +52,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'yarn'
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
       - name: Build macOS (dmg + zip, Intel x64 + Apple Silicon arm64)
-        run: yarn release --mac
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: yarn package --mac
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v5
@@ -70,3 +69,21 @@ jobs:
             release/*.dmg
             release/*-mac.zip
             release/*-mac-arm64.zip
+
+  publish:
+    name: Publish GitHub Release
+    needs: [build_windows_linux, build_macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

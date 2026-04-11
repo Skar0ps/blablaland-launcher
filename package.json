@@ -5,7 +5,10 @@
   "description": "Launcher pour Blablastrae",
   "homepage": "https://skar0ps.dev",
   "main": "index.js",
-  "author": "Skar0ps",
+  "author": {
+    "name": "Skar0ps",
+    "email": "contact@skar0ps.dev"
+  },
   "scripts": {
     "package": "electron-builder --publish never",
     "release": "electron-builder --publish always",
