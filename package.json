@@ -2,17 +2,35 @@
   "name": "blablastrae",
   "version": "1.5.2",
   "productName": "Blablastrae Launcher",
-  "description": "Launcher pour Blablastrae",
+  "description": "Launcher Electron avec support Flash pour jouer à Blablastrae.",
   "homepage": "https://skar0ps.dev",
   "main": "index.js",
+  "license": "UNLICENSED",
+  "private": true,
   "author": {
     "name": "Skar0ps",
-    "email": "contact@skar0ps.dev"
+    "email": "contact@skar0ps.dev",
+    "url": "https://skar0ps.dev"
+  },
+  "keywords": [
+    "blablaland",
+    "blablastrae",
+    "flash",
+    "electron",
+    "launcher",
+    "retro"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Skar0ps/blablaland-launcher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Skar0ps/blablaland-launcher/issues"
   },
   "scripts": {
+    "start": "electron .",
     "package": "electron-builder --publish never",
     "release": "electron-builder --publish always",
-    "start": "electron .",
     "dist": "electron-builder --win"
   },
   "devDependencies": {
