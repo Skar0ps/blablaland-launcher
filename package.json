@@ -1,7 +1,7 @@
 {
   "name": "blablastrae",
-  "version": "1.0.5",
-  "productName": "Blablastrae",
+  "version": "1.5.2",
+  "productName": "Blablastrae Launcher",
   "description": "Launcher pour Blablastrae",
   "homepage": "https://skar0ps.dev",
   "main": "index.js",

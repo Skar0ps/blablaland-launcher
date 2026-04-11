@@ -1,0 +1,72 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v[0-9]+.*'
+
+jobs:
+  build_windows_linux:
+    name: Build for Windows & Linux
+    runs-on: ubuntu-latest
+    container:
+      image: electronuserland/builder:wine
+      options: --user 1001
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build Windows (NSIS + Portable) & Linux (AppImage + deb + rpm)
+        run: yarn release --win --linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-builds-windows
+          path: |
+            release/*.exe
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-builds-linux
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+
+  build_macos:
+    name: Build for macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build macOS (dmg + zip, Intel x64 + Apple Silicon arm64)
+        run: yarn release --mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-builds-macos
+          path: |
+            release/*.dmg
+            release/*-mac.zip
+            release/*-mac-arm64.zip

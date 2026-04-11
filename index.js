@@ -1,133 +1,308 @@
-const { app, BrowserWindow, Menu, shell, MenuItem } = require('electron');
+const { app, BrowserWindow, Menu, MenuItem, shell, dialog, screen } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
-// --- Configuration ---
-const GAME_URL = 'http://blablaland-site.test'; // TODO: Remplacer par l'URL de production
+// const GAME_URL = 'https://blablaland-site.test';
+const GAME_URL = 'https://beta.blablastrae.com';
+
 const GAME_ORIGIN = new URL(GAME_URL).origin;
-// ---------------------
+
+const BETA_USER = Buffer.from('dGVzdGVy', 'base64').toString()
+const BETA_PASS = Buffer.from('ZmFyaW5lYXJhYmU=', 'base64').toString();
+
+const isDev = true;
 
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
   app.quit();
 } else {
-  // --- Optimisations de performance ---
-  // Désactive l'accélération matérielle. Peut améliorer les performances sur les PC
-  // très bas de gamme ou avec des pilotes graphiques instables, au détriment d'animations
-  // potentiellement moins fluides dans l'interface web (n'affecte pas Flash directement).
-  app.disableHardwareAcceleration();
 
   const createMenu = () => {
-    // Optimisation : Pas de menu natif (gain de place et de mémoire)
-    Menu.setApplicationMenu(null);
+    const menuTemplate = [
+      {
+        label: 'Application',
+        submenu: [
+          { label: 'Recharger', role: 'reload' },
+          {
+            label: 'Recharger (F5)',
+            accelerator: 'F5',
+            click: (_, focusedWindow) => {
+              if (focusedWindow) focusedWindow.webContents.reload();
+            }
+          },
+          { label: 'Forcer le rechargement', role: 'forceReload' },
+          { type: 'separator' },
+          {
+            label: 'Plein écran',
+            accelerator: 'F11',
+            click: (_, focusedWindow) => {
+              if (focusedWindow) focusedWindow.setFullScreen(!focusedWindow.isFullScreen());
+            }
+          }
+        ]
+      }
+    ];
+
+    if (isDev) {
+      menuTemplate[0].submenu.push({ type: 'separator' });
+      menuTemplate[0].submenu.push({ label: 'Ouvrir les DevTools', role: 'toggleDevTools' });
+    }
+
+    Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
+  };
+
+  const windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
+
+  const loadWindowState = () => {
+    try {
+      return JSON.parse(fs.readFileSync(windowStatePath, 'utf8'));
+    } catch {
+      return null;
+    }
+  };
+
+  const saveWindowState = (win) => {
+    if (win.isMaximized() || win.isMinimized() || win.isFullScreen()) return;
+    const bounds = win.getBounds();
+    fs.writeFileSync(windowStatePath, JSON.stringify(bounds));
   };
 
   let splashWindow;
   let splashStartTime;
 
-  // let test;
+  const centerOnCurrentDisplay = (width, height) => {
+    const { bounds } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+    return {
+      x: Math.round(bounds.x + (bounds.width - width) / 2),
+      y: Math.round(bounds.y + (bounds.height - height) / 2)
+    };
+  };
 
   const createSplashWindow = () => {
-    splashStartTime = Date.now();
     splashWindow = new BrowserWindow({
       width: 512,
       height: 512,
       frame: false,
       transparent: true,
       resizable: false,
-      center: true,
-      icon: path.join(__dirname, 'assets/icon.ico'),
+      show: false,
+      ...centerOnCurrentDisplay(512, 512),
+      icon: path.join(__dirname, 'build/icon.ico'),
       webPreferences: { devTools: false }
     });
     splashWindow.loadFile(path.join(__dirname, 'assets/splash.html'));
+    splashWindow.once('ready-to-show', () => {
+      splashWindow.show();
+      setTimeout(() => {
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashStartTime = Date.now();
+          splashWindow.webContents.executeJavaScript('document.body.classList.add("animate")');
+        }
+      }, 100);
+    });
   };
 
   const createWindow = () => {
+    const savedState = loadWindowState();
+    const defaultWidth = 1280;
+    const defaultHeight = 720;
+    const windowPos = savedState
+      ? { x: savedState.x, y: savedState.y, width: savedState.width, height: savedState.height }
+      : { width: defaultWidth, height: defaultHeight, ...centerOnCurrentDisplay(defaultWidth, defaultHeight) };
+
     const mainWindow = new BrowserWindow({
-      width: 1040,
-      height: 730,
-      center: true,
-      icon: path.join(__dirname, 'assets/icon.ico'),
+      ...windowPos,
+      icon: path.join(__dirname, 'build/icon.ico'),
       show: false,
       autoHideMenuBar: true,
       webPreferences: {
         contextIsolation: true,
         plugins: true,
-        devTools: false,
+        devTools: isDev,  
         nodeIntegration: false,
         enableRemoteModule: false,
         safeDialogs: true
       },
     });
 
-    // Show the main window when it's ready
+    mainWindow.on('close', () => saveWindowState(mainWindow));
+
+    mainWindow.webContents.on('did-start-loading', () => {
+      mainWindow.setProgressBar(2); // mode indéterminé (animation pulsante)
+    });
+
+    mainWindow.webContents.on('did-stop-loading', () => {
+      mainWindow.setProgressBar(-1); // retire la barre
+    });
+
     mainWindow.once('ready-to-show', () => {
       const elapsed = Date.now() - splashStartTime;
-      const minSplashDuration = 1500; // 1.5s pour laisser l'animation se terminer
+      const minSplashDuration = 1100;
       const delay = elapsed >= minSplashDuration ? 0 : minSplashDuration - elapsed;
 
       setTimeout(() => {
         if (splashWindow && !splashWindow.isDestroyed()) {
           splashWindow.webContents.executeJavaScript('document.body.classList.add("fade-out")');
           setTimeout(() => {
-            if (splashWindow && !splashWindow.isDestroyed()) {
-              splashWindow.destroy();
-            }
+            if (splashWindow && !splashWindow.isDestroyed()) splashWindow.destroy();
             mainWindow.show();
-          }, 500);
+          }, 1000);
         } else {
           mainWindow.show();
         }
       }, delay);
     });
 
-    // Display context menu
-    mainWindow.webContents.on('context-menu', (event, params) => {
-      const contextMenu = Menu.buildFromTemplate([
-        { role: 'reload' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-      ]);
-      contextMenu.popup(mainWindow, params.x, params.y);
+    const attachContextMenu = (win) => {
+      win.webContents.on('context-menu', (_event, params) => {
+        const contextMenu = Menu.buildFromTemplate([
+          { role: 'reload', label: "Recharger la page"},
+          { role: 'forceReload', label: "Forcer le rechargement"},
+          { type: 'separator' },
+          { role: 'resetZoom', label: "Réinitialiser zoom"},
+          { role: 'zoomIn', label: "Zoomer"},
+          { role: 'zoomOut', label: "Dézoomer"},
+          { type: 'separator' },
+          { role: 'togglefullscreen', label: 'Plein écran'},
+        ]);
+        if (isDev) {
+          contextMenu.append(new MenuItem({ type: 'separator' }));
+          contextMenu.append(new MenuItem({
+            label: 'Devtools',
+            click: () => {
+              win.webContents.inspectElement(params.x, params.y);
+            }
+          }));
+        }
+        contextMenu.popup(win, params.x, params.y);
+      });
+    };
+
+    attachContextMenu(mainWindow);
+
+    mainWindow.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
+      callback({
+        requestHeaders: {
+          ...details.requestHeaders,
+          'User-Agent': details.requestHeaders['User-Agent'] + ' BlablaLauncher/1.0'
+        }
+      });
     });
 
-    // Sécurité : Intercepter et définir la Content Security Policy (CSP)
     mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+      if (isDev) {
+        // en dev : pas de CSP injectée, on laisse passer les headers du serveur tels quels
+        callback({ responseHeaders: details.responseHeaders });
+        return;
+      }
+
+      // CSP stricte en production
       callback({
         responseHeaders: {
           ...details.responseHeaders,
           'Content-Security-Policy': [
-            `default-src 'self' ${GAME_ORIGIN} data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' ${GAME_ORIGIN}; object-src 'self' 'unsafe-inline' 'unsafe-eval' ${GAME_ORIGIN}; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; connect-src *;`
+            [
+              `default-src 'self' ${GAME_ORIGIN} data: blob:`,
+              `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${GAME_ORIGIN}`,
+              `object-src 'self' ${GAME_ORIGIN}`,
+              `style-src * 'unsafe-inline'`,
+              `img-src * data: blob:`,
+              `font-src * data:`,
+              `connect-src * ws: wss:`,  // ws: explicite pour les WebSockets
+              `media-src 'self' ${GAME_ORIGIN}`
+            ].join('; ')
           ]
         }
       });
     });
 
-    // Sécurité : Bloquer les demandes de permissions (caméra, micro, notifications, etc.)
-    mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+
+    // bloquer toutes les demandes de permissions (caméra, micro, notifications, etc.)
+    mainWindow.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
       callback(false);
     });
 
-    // Sécurité : Empêcher la navigation vers des sites tiers
+    const confirmAndOpenExternal = (url) => {
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        buttons: ['Annuler', 'Ouvrir'],
+        defaultId: 1,
+        cancelId: 0,
+        title: 'Lien externe',
+        message: 'Êtes-vous sûr d\'ouvrir cette page ?',
+        detail: 'Elle sera ouverte dans votre navigateur par défaut car elle ne fait pas partie de Blablastrae.'
+      });
+      if (choice === 1) shell.openExternal(url);
+    };
+
     mainWindow.webContents.on('will-navigate', (event, url) => {
-      const parsedUrl = new URL(url);
-      if (parsedUrl.origin !== GAME_ORIGIN) {
-        event.preventDefault();
+      try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.origin !== GAME_ORIGIN) {
+          event.preventDefault();
+          confirmAndOpenExternal(url);
+        }
+      } catch (e) {
+        event.preventDefault(); 
       }
     });
 
-    // Sécurité : Gérer l'ouverture de nouvelles fenêtres (bloquer ou ouvrir dans le navigateur par défaut)
     mainWindow.webContents.on('new-window', (event, url) => {
       event.preventDefault();
-      if (url.startsWith('http')) {
-        shell.openExternal(url);
+      try {
+        const urlOrigin = new URL(url).origin;
+        if (urlOrigin === GAME_ORIGIN) {
+          const { bounds } = screen.getDisplayMatching(mainWindow.getBounds());
+          const newWin = new BrowserWindow({
+            width: 1024,
+            height: 768,
+            x: Math.round(bounds.x + (bounds.width - 1024) / 2),
+            y: Math.round(bounds.y + (bounds.height - 768) / 2),
+            autoHideMenuBar: true,
+            icon: path.join(__dirname, 'build/icon.ico'),
+            webPreferences: {
+              contextIsolation: true,
+              nodeIntegration: false,
+              enableRemoteModule: false,
+              plugins: true,
+              devTools: isDev
+            }
+          });
+          newWin.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
+            callback({
+              requestHeaders: {
+                ...details.requestHeaders,
+                'User-Agent': details.requestHeaders['User-Agent'] + ' BlablaLauncher/1.0'
+              }
+            });
+          });
+          attachContextMenu(newWin);
+          newWin.webContents.on('login', (event, _authDetails, authInfo, callback) => {
+            if (authInfo.isProxy || authInfo.host !== new URL(GAME_URL).hostname) return;
+            event.preventDefault();
+            callback(BETA_USER, BETA_PASS);
+          });
+          newWin.loadURL(url);
+        } else if (url.startsWith('https://') || url.startsWith('http://')) {
+          confirmAndOpenExternal(url);
+        }
+      } catch (e) {
       }
     });
 
-    // Load the URL into the main window
+    // authentification HTTP Basic (protection nginx 401)
+    mainWindow.webContents.on(
+      'login',
+      (event, _authDetails, authInfo, callback) => {
+        if (authInfo.isProxy || authInfo.host !== new URL(GAME_URL).hostname) return;
+        event.preventDefault();
+        callback(BETA_USER, BETA_PASS);
+      }
+    );
     mainWindow.loadURL(GAME_URL);
+
+    if (isDev) mainWindow.webContents.openDevTools();
   };
 
   const initializeFlashPlugin = () => {
@@ -162,9 +337,7 @@ if (!gotTheLock) {
   });
 
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-      app.quit();
-    }
+    if (process.platform !== 'darwin') app.quit();
   });
 
   initializeFlashPlugin();
@@ -175,9 +348,7 @@ if (!gotTheLock) {
     createWindow();
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-      }
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
   });
 }
