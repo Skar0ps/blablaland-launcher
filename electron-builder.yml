@@ -49,6 +49,7 @@ win:
   icon: "build/icon.ico"
 
 linux:
+  icon: "build/icon.png"
   target:
     - target: "AppImage"
       arch:
