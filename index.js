@@ -10,7 +10,7 @@ const GAME_ORIGIN = new URL(GAME_URL).origin;
 const BETA_USER = Buffer.from('dGVzdGVy', 'base64').toString()
 const BETA_PASS = Buffer.from('ZmFyaW5lYXJhYmU=', 'base64').toString();
 
-const isDev = true;
+const isDev = !app.isPackaged;
 
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -88,7 +88,7 @@ if (!gotTheLock) {
       resizable: false,
       show: false,
       ...centerOnCurrentDisplay(512, 512),
-      icon: path.join(__dirname, 'build/icon.ico'),
+      icon: path.join(__dirname, 'build/logo.png'),
       webPreferences: { devTools: false }
     });
     splashWindow.loadFile(path.join(__dirname, 'assets/splash.html'));
@@ -113,7 +113,7 @@ if (!gotTheLock) {
 
     const mainWindow = new BrowserWindow({
       ...windowPos,
-      icon: path.join(__dirname, 'build/icon.ico'),
+      icon: path.join(__dirname, 'build/logo.png'),
       show: false,
       autoHideMenuBar: true,
       webPreferences: {
@@ -260,7 +260,7 @@ if (!gotTheLock) {
             x: Math.round(bounds.x + (bounds.width - 1024) / 2),
             y: Math.round(bounds.y + (bounds.height - 768) / 2),
             autoHideMenuBar: true,
-            icon: path.join(__dirname, 'build/icon.ico'),
+            icon: path.join(__dirname, 'build/logo.png'),
             webPreferences: {
               contextIsolation: true,
               nodeIntegration: false,
