@@ -39,14 +39,69 @@ if (!gotTheLock) {
             click: (_, focusedWindow) => {
               if (focusedWindow) focusedWindow.setFullScreen(!focusedWindow.isFullScreen());
             }
+          },
+          { type: 'separator' },
+          { label: 'Quitter', role: 'quit' }
+        ]
+      },
+      {
+        label: 'Édition',
+        submenu: [
+          { label: 'Annuler', role: 'undo' },
+          { label: 'Rétablir', role: 'redo' },
+          { type: 'separator' },
+          { label: 'Couper', role: 'cut' },
+          { label: 'Copier', role: 'copy' },
+          { label: 'Coller', role: 'paste' },
+          { label: 'Supprimer', role: 'delete' },
+          { type: 'separator' },
+          { label: 'Tout sélectionner', role: 'selectAll' }
+        ]
+      },
+      {
+        label: 'Affichage',
+        submenu: [
+          { label: 'Zoomer', role: 'zoomIn' },
+          { label: 'Dézoomer', role: 'zoomOut' },
+          { label: 'Réinitialiser le zoom', role: 'resetZoom' },
+          { type: 'separator' },
+          {
+            label: 'Plein écran',
+            accelerator: 'F11',
+            click: (_, focusedWindow) => {
+              if (focusedWindow) focusedWindow.setFullScreen(!focusedWindow.isFullScreen());
+            }
+          }
+        ]
+      },
+      {
+        label: 'Navigation',
+        submenu: [
+          {
+            label: 'Retour',
+            accelerator: 'Alt+Left',
+            click: (_, focusedWindow) => {
+              if (focusedWindow && focusedWindow.webContents.canGoBack()) {
+                focusedWindow.webContents.goBack();
+              }
+            }
+          },
+          {
+            label: 'Avancer',
+            accelerator: 'Alt+Right',
+            click: (_, focusedWindow) => {
+              if (focusedWindow && focusedWindow.webContents.canGoForward()) {
+                focusedWindow.webContents.goForward();
+              }
+            }
           }
         ]
       }
     ];
 
     if (isDev) {
-      menuTemplate[0].submenu.push({ type: 'separator' });
-      menuTemplate[0].submenu.push({ label: 'Ouvrir les DevTools', role: 'toggleDevTools' });
+      menuTemplate[0].submenu.splice(-2, 0, { label: 'Ouvrir les DevTools', role: 'toggleDevTools' });
+      menuTemplate[0].submenu.splice(-2, 0, { type: 'separator' });
     }
 
     Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
@@ -88,7 +143,7 @@ if (!gotTheLock) {
       resizable: false,
       show: false,
       ...centerOnCurrentDisplay(512, 512),
-      icon: path.join(__dirname, 'build/logo.png'),
+      icon: path.join(__dirname, 'build/icon.png'),
       webPreferences: { devTools: false }
     });
     splashWindow.loadFile(path.join(__dirname, 'assets/splash.html'));
@@ -113,7 +168,7 @@ if (!gotTheLock) {
 
     const mainWindow = new BrowserWindow({
       ...windowPos,
-      icon: path.join(__dirname, 'build/logo.png'),
+      icon: path.join(__dirname, 'build/icon.png'),
       show: false,
       autoHideMenuBar: true,
       webPreferences: {
@@ -260,7 +315,7 @@ if (!gotTheLock) {
             x: Math.round(bounds.x + (bounds.width - 1024) / 2),
             y: Math.round(bounds.y + (bounds.height - 768) / 2),
             autoHideMenuBar: true,
-            icon: path.join(__dirname, 'build/logo.png'),
+            icon: path.join(__dirname, 'build/icon.png'),
             webPreferences: {
               contextIsolation: true,
               nodeIntegration: false,
