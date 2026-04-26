@@ -54,17 +54,16 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build macOS (dmg + zip, Intel x64 + Apple Silicon arm64)
-        run: yarn package --mac
+      - name: Build macOS app (sans DMG, x64 uniquement)
+        run: yarn electron-builder --mac --x64 --dir
 
-      - name: Sign macOS apps (ad-hoc, sans certificat Apple)
+      - name: Signature ad-hoc du .app
+        run: codesign --force --deep --sign - "release/mac/Blablastrae Launcher.app"
+
+      - name: Package DMG et ZIP à partir du .app signé
         run: |
-          for app in release/mac/*.app release/mac-arm64/*.app; do
-            if [ -d "$app" ]; then
-              echo "Signature ad-hoc de : $app"
-              codesign --force --deep --sign - "$app"
-            fi
-          done
+          yarn electron-builder --mac dmg zip --x64 \
+            --prepackaged "release/mac/Blablastrae Launcher.app"
 
       - name: Publish macOS to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
