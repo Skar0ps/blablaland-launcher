@@ -60,17 +60,15 @@ jobs:
       - name: Signature ad-hoc du .app
         run: codesign --force --deep --sign - "release/mac/Blablastrae Launcher.app"
 
-      - name: Package DMG et ZIP à partir du .app signé
+      - name: Package DMG à partir du .app signé
         run: |
-          yarn electron-builder --mac dmg zip --x64 \
+          yarn electron-builder --mac dmg --x64 --publish never \
             --prepackaged "release/mac/Blablastrae Launcher.app"
 
       - name: Publish macOS to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release/*.dmg
-            release/*.zip
+          files: release/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

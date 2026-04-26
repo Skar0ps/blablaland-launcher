@@ -30,9 +30,6 @@ mac:
     - target: "dmg"
       arch:
         - x64
-    - target: "zip"
-      arch:
-        - x64
   icon: "build/icon.png"
   # Désactive la signature automatique d'electron-builder (pas de cert Apple Developer)
   # La signature ad-hoc est appliquée manuellement via codesign dans le workflow CI
@@ -47,6 +44,7 @@ win:
     - target: "portable"
       arch:
         - x64
+        - ia32
   icon: "build/icon.ico"
 
 linux:

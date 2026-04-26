@@ -6,9 +6,16 @@ const fs = require('fs');
 const GAME_URL = 'https://beta.blablastrae.com';
 
 const GAME_ORIGIN = new URL(GAME_URL).origin;
+const GAME_DOMAIN = 'blablastrae.com';
 
-const BETA_USER = Buffer.from('dGVzdGVy', 'base64').toString()
-const BETA_PASS = Buffer.from('ZmFyaW5lYXJhYmU=', 'base64').toString();
+const isGameUrl = (url) => {
+  try {
+    const host = new URL(url).hostname;
+    return host === GAME_DOMAIN || host.endsWith('.' + GAME_DOMAIN);
+  } catch {
+    return false;
+  }
+};
 
 const isDev = !app.isPackaged;
 
@@ -258,14 +265,14 @@ if (!gotTheLock) {
           ...details.responseHeaders,
           'Content-Security-Policy': [
             [
-              `default-src 'self' ${GAME_ORIGIN} data: blob:`,
-              `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${GAME_ORIGIN}`,
-              `object-src 'self' ${GAME_ORIGIN}`,
+              `default-src 'self' https://*.${GAME_DOMAIN} data: blob:`,
+              `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.${GAME_DOMAIN}`,
+              `object-src 'self' https://*.${GAME_DOMAIN}`,
               `style-src * 'unsafe-inline'`,
               `img-src * data: blob:`,
               `font-src * data:`,
-              `connect-src * ws: wss:`,  // ws: explicite pour les WebSockets
-              `media-src 'self' ${GAME_ORIGIN}`
+              `connect-src * ws: wss:`,
+              `media-src 'self' https://*.${GAME_DOMAIN}`
             ].join('; ')
           ]
         }
@@ -293,21 +300,19 @@ if (!gotTheLock) {
 
     mainWindow.webContents.on('will-navigate', (event, url) => {
       try {
-        const parsedUrl = new URL(url);
-        if (parsedUrl.origin !== GAME_ORIGIN) {
+        if (!isGameUrl(url)) {
           event.preventDefault();
           confirmAndOpenExternal(url);
         }
       } catch (e) {
-        event.preventDefault(); 
+        event.preventDefault();
       }
     });
 
     mainWindow.webContents.on('new-window', (event, url) => {
       event.preventDefault();
       try {
-        const urlOrigin = new URL(url).origin;
-        if (urlOrigin === GAME_ORIGIN) {
+        if (isGameUrl(url)) {
           const { bounds } = screen.getDisplayMatching(mainWindow.getBounds());
           const newWin = new BrowserWindow({
             width: 1024,
@@ -333,11 +338,6 @@ if (!gotTheLock) {
             });
           });
           attachContextMenu(newWin);
-          newWin.webContents.on('login', (event, _authDetails, authInfo, callback) => {
-            if (authInfo.isProxy || authInfo.host !== new URL(GAME_URL).hostname) return;
-            event.preventDefault();
-            callback(BETA_USER, BETA_PASS);
-          });
           newWin.loadURL(url);
         } else if (url.startsWith('https://') || url.startsWith('http://')) {
           confirmAndOpenExternal(url);
@@ -346,40 +346,44 @@ if (!gotTheLock) {
       }
     });
 
-    // authentification HTTP Basic (protection nginx 401)
-    mainWindow.webContents.on(
-      'login',
-      (event, _authDetails, authInfo, callback) => {
-        if (authInfo.isProxy || authInfo.host !== new URL(GAME_URL).hostname) return;
-        event.preventDefault();
-        callback(BETA_USER, BETA_PASS);
-      }
-    );
     mainWindow.loadURL(GAME_URL);
 
     if (isDev) mainWindow.webContents.openDevTools();
   };
 
   const initializeFlashPlugin = () => {
-    let pluginName;
-    switch (process.platform) {
-      case 'win32':
-        pluginName = app.isPackaged ? 'pepflashplayer.dll' : 'win/x64/pepflashplayer.dll';
-        break;
-      case 'darwin':
-        pluginName = 'PepperFlashPlayer.plugin';
-        break;
-      default:
-        pluginName = 'libpepflashplayer.so';
-    }
+    let pluginPath;
+    const arch = process.arch === 'ia32' ? 'ia32' : 'x64';
 
-    const resourcesPath = app.isPackaged ? process.resourcesPath : __dirname;
+    if (app.isPackaged) {
+      switch (process.platform) {
+        case 'win32':
+          pluginPath = path.join(process.resourcesPath, 'plugins', 'pepflashplayer.dll');
+          break;
+        case 'darwin':
+          pluginPath = path.join(process.resourcesPath, 'plugins', 'PepperFlashPlayer.plugin');
+          break;
+        default:
+          pluginPath = path.join(process.resourcesPath, 'plugins', 'libpepflashplayer.so');
+      }
+    } else {
+      switch (process.platform) {
+        case 'win32':
+          pluginPath = path.join(__dirname, 'plugins', 'win', arch, 'pepflashplayer.dll');
+          break;
+        case 'darwin':
+          pluginPath = path.join(__dirname, 'plugins', 'mac', 'x64', 'PepperFlashPlayer.plugin');
+          break;
+        default:
+          pluginPath = path.join(__dirname, 'plugins', 'linux', arch, 'libpepflashplayer.so');
+      }
+    }
 
     if (['freebsd', 'linux', 'netbsd', 'openbsd'].includes(process.platform)) {
       app.commandLine.appendSwitch('no-sandbox');
     }
 
-    app.commandLine.appendSwitch('ppapi-flash-path', path.join(resourcesPath, 'plugins', pluginName));
+    app.commandLine.appendSwitch('ppapi-flash-path', pluginPath);
     app.commandLine.appendSwitch('ppapi-flash-version', '32.0.0.465');
   };
 

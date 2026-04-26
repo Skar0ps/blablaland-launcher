@@ -69,11 +69,31 @@ Une fois les jobs terminés (icône verte), cliquez sur le workflow run, puis sc
 
 ### Fichiers générés
 
-| Plateforme | Artifact GitHub Actions | Formats |
+Les fichiers sont publiés directement dans la **GitHub Release** (onglet Releases du repo), pas dans les artifacts du workflow.
+
+| Plateforme | Fichier | Notes |
 |---|---|---|
-| **Windows** | `release-builds-windows` | `.exe` (installateur NSIS x64 + x86) + `.exe` (portable x64) |
-| **Linux** | `release-builds-linux` | `.AppImage`, `.deb`, `.rpm` en x64 |
-| **macOS** | `release-builds-macos` | `.dmg` + `.zip` en Intel (x64) et Apple Silicon (arm64) |
+| **Windows 64 bits** | `*-Setup.exe` | Installateur NSIS — recommandé |
+| **Windows 64 bits** | `*.exe` (portable) | Aucune installation requise |
+| **Windows 32 bits** | `*-ia32-Setup.exe` | Installateur NSIS |
+| **Windows 32 bits** | `*-ia32.exe` (portable) | Aucune installation requise |
+| **macOS** | `*.dmg` | Intel x64 — tourne aussi sur Apple Silicon via Rosetta 2 |
+| **Linux** | `*.AppImage` | Universel, aucune installation |
+| **Linux** | `*.deb` | Debian / Ubuntu |
+| **Linux** | `*.rpm` | Fedora / RHEL |
+
+### Installation macOS
+
+Le launcher n'est pas signé avec un certificat Apple Developer. À la première ouverture, macOS affiche **"développeur non identifié"**.
+
+**Procédure :**
+1. Double-clic sur le `.dmg` → glisser l'app dans Applications
+2. **Ne pas** double-cliquer sur l'app directement — faire **clic droit → Ouvrir**
+3. Dans la popup, cliquer **Ouvrir** pour confirmer
+
+Cette manipulation n'est nécessaire qu'une seule fois. Les lancements suivants sont normaux.
+
+> **Apple Silicon (M1/M2/M3/M4)** : le launcher est compilé en x64 et tourne automatiquement via Rosetta 2. Si Rosetta n'est pas installée, macOS propose de l'installer automatiquement (gratuit, un seul clic).
 
 ### Supprimer un tag (si besoin de relancer)
 
