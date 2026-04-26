@@ -26,21 +26,17 @@ jobs:
       - name: Build Windows (NSIS + Portable) & Linux (AppImage + deb + rpm)
         run: yarn package --win --linux
 
-      - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v5
+      - name: Publish Windows & Linux to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
         with:
-          name: release-builds-windows
-          path: |
+          files: |
             release/*.exe
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: release-builds-linux
-          path: |
             release/*.AppImage
             release/*.deb
             release/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build_macos:
     name: Build for macOS
@@ -70,28 +66,12 @@ jobs:
             fi
           done
 
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: release-builds-macos
-          path: |
-            release/*.dmg
-            release/*.zip
-
-  publish:
-    name: Publish GitHub Release
-    needs: [build_windows_linux, build_macos]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: artifacts
-
-      - name: Create GitHub Release
+      - name: Publish macOS to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: |
+            release/*.dmg
+            release/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
