@@ -1,0 +1,22 @@
+★ Installation de Blablastrae Launcher sur macOS ★
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ETAPE 1 - Installer le launcher
+1. Ouvre le fichier "Blablastrae Launcher-x.x.x.dmg"
+2. Glisse l'application dans le dossier Applications.
+3. Ferme la fenetre du DMG.
+
+ETAPE 2 - Autoriser le launcher
+4. Double-clique sur "Installer Blablastrae.command".
+5. Une fenêtre de terminal s'ouvre et te demande ton mot de passe macOS.
+6. Entre ton mot de passe (les caractères n'apparaissent pas, c'est normal).
+7. Appuie sur Entrée.
+
+Le launcher se lance automatiquement une fois l'installation terminee.
+Les prochains lancements se font directement depuis Applications, sans repeter ces etapes.
+
+
+Probleme connu : "Blablastrae Launcher est endommage et ne peut pas etre ouvert"
+  Ce message apparait si tu essaies de lancer l'app avant d'avoir exécuté le script.
+  Relance "Installer Blablastrae.command" pour resoudre le probleme.
+  Si ça ne fonctionne pas, contacte moi sur Discord (skar0ps) avec explication de ce que tu as fais.

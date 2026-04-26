@@ -1,10 +1,17 @@
-# Launcher Blablaland (Public)
+# Launcher Blablaland
 
 Launcher basé sur Electron permettant de jouer à Blablaland (ou tout autre jeu flash présent sur un site web).
 
 Basé à l'origine sur le launcher de [Panfu](https://github.com/teampanfu/panfu-desktop).
 
-## Prérequis
+## Table des matières
+
+*   [Installation et Configuration](#installation-et-configuration)
+*   [Développement](#développement)
+*   [Intégration Continue](#intégration-continue-github-actions)
+*   [Multiple Instances](#instances-multiples-en-parallèle)
+
+## ★ Prérequis
 
 *   [Node.js](https://nodejs.org/) (Version LTS recommandée)
 *   [Yarn](https://yarnpkg.com/) (`npm install -g yarn`)
@@ -56,8 +63,8 @@ Pour déclencher un build et générer les installateurs d'une nouvelle version 
     ```
 
 GitHub Actions détectera le tag automatiquement et lancera deux jobs en parallèle :
-- **Windows & Linux** — sur un runner Ubuntu avec Wine (via Docker)
-- **macOS** — sur un runner macOS natif (nécessaire pour compiler `.dmg`)
+- **Windows & Linux** - sur un runner Ubuntu avec Wine (via Docker)
+- **macOS** - sur un runner macOS natif (nécessaire pour compiler `.dmg`)
 
 ### Suivre le build
 
@@ -65,7 +72,7 @@ Une fois le tag poussé, allez dans l'onglet **Actions** de votre repo GitHub. V
 
 ### Récupérer les fichiers compilés
 
-Une fois les jobs terminés (icône verte), cliquez sur le workflow run, puis scrollez jusqu'à la section **Artifacts** en bas de page pour télécharger les zips.
+Une fois les jobs terminés (icône verte), les fichiers sont disponibles dans l'onglet **Releases** du repo GitHub.
 
 ### Fichiers générés
 
@@ -73,27 +80,32 @@ Les fichiers sont publiés directement dans la **GitHub Release** (onglet Releas
 
 | Plateforme | Fichier | Notes |
 |---|---|---|
-| **Windows 64 bits** | `*-Setup.exe` | Installateur NSIS — recommandé |
+| **Windows 64 bits** | `*-Setup.exe` | Installateur NSIS ⇢ recommandé |
 | **Windows 64 bits** | `*.exe` (portable) | Aucune installation requise |
 | **Windows 32 bits** | `*-ia32-Setup.exe` | Installateur NSIS |
 | **Windows 32 bits** | `*-ia32.exe` (portable) | Aucune installation requise |
-| **macOS** | `*.dmg` | Intel x64 — tourne aussi sur Apple Silicon via Rosetta 2 |
+| **macOS** | `*.dmg` | Intel x64 ⇢ tourne aussi sur Apple Silicon via Rosetta 2 |
 | **Linux** | `*.AppImage` | Universel, aucune installation |
 | **Linux** | `*.deb` | Debian / Ubuntu |
 | **Linux** | `*.rpm` | Fedora / RHEL |
 
 ### Installation macOS
 
-Le launcher n'est pas signé avec un certificat Apple Developer. À la première ouverture, macOS affiche **"développeur non identifié"**.
+Le launcher n'est pas signé avec un certificat Apple Developer. Un script d'installation est fourni pour autoriser l'app en un double-clic.
+
+**Fichiers à télécharger :**
+- `Blablastrae Launcher-x.x.x.dmg` - l'application
+- `Installer-Blablastrae-macOS.zip` - le script d'installation
 
 **Procédure :**
-1. Double-clic sur le `.dmg` → glisser l'app dans Applications
-2. **Ne pas** double-cliquer sur l'app directement — faire **clic droit → Ouvrir**
-3. Dans la popup, cliquer **Ouvrir** pour confirmer
+1. Ouvre le `.dmg` et glisse l'app dans le dossier Applications. Ferme la fenêtre du DMG.
+2. Extrait le ZIP et double-clique sur `Installer Blablastrae.command`.
+3. Une fenêtre Terminal s'ouvre et demande ton mot de passe macOS. Les caractères n'apparaissent pas à la saisie, c'est normal.
+4. Le launcher se lance automatiquement une fois terminé.
 
-Cette manipulation n'est nécessaire qu'une seule fois. Les lancements suivants sont normaux.
+Ces étapes ne sont nécessaires qu'une seule fois. Les lancements suivants se font directement depuis Applications.
 
-> **Apple Silicon (M1/M2/M3/M4)** : le launcher est compilé en x64 et tourne automatiquement via Rosetta 2. Si Rosetta n'est pas installée, macOS propose de l'installer automatiquement (gratuit, un seul clic).
+> **Apple Silicon (M1/M2/M3/M4)** : le launcher est compilé en x64 et tourne automatiquement via Rosetta 2. Si Rosetta n'est pas installée, macOS propose de l'installer au premier lancement (gratuit, un seul clic).
 
 ### Supprimer un tag (si besoin de relancer)
 
@@ -111,7 +123,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-## Instances multiples en parallèle
+# Instances multiples en parallèle
 
 Si vous basez plusieurs launchers sur ce repo (ex : un pour "Blablaconv" et un pour "Blablavard"),
 chaque launcher doit avoir un `productName` et un `appId` **uniques**, sinon le second launcher
