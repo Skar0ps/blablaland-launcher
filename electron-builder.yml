@@ -36,6 +36,9 @@ mac:
         - x64
         - arm64
   icon: "build/icon.png"
+  # Désactive la signature automatique d'electron-builder (pas de cert Apple Developer)
+  # La signature ad-hoc est appliquée manuellement via codesign dans le workflow CI
+  identity: null
 
 win:
   target:

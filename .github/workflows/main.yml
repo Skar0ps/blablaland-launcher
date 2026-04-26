@@ -61,14 +61,22 @@ jobs:
       - name: Build macOS (dmg + zip, Intel x64 + Apple Silicon arm64)
         run: yarn package --mac
 
+      - name: Sign macOS apps (ad-hoc, sans certificat Apple)
+        run: |
+          for app in release/mac/*.app release/mac-arm64/*.app; do
+            if [ -d "$app" ]; then
+              echo "Signature ad-hoc de : $app"
+              codesign --force --deep --sign - "$app"
+            fi
+          done
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v5
         with:
           name: release-builds-macos
           path: |
             release/*.dmg
-            release/*-mac.zip
-            release/*-mac-arm64.zip
+            release/*.zip
 
   publish:
     name: Publish GitHub Release
