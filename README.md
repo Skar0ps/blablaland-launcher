@@ -80,10 +80,8 @@ Les fichiers sont publiés directement dans la **GitHub Release** (onglet Releas
 
 | Plateforme | Fichier | Notes |
 |---|---|---|
-| **Windows 64 bits** | `*-Setup.exe` | Installateur NSIS ⇢ recommandé |
-| **Windows 64 bits** | `*.exe` (portable) | Aucune installation requise |
-| **Windows 32 bits** | `*-ia32-Setup.exe` | Installateur NSIS |
-| **Windows 32 bits** | `*-ia32.exe` (portable) | Aucune installation requise |
+| **Windows** | `*-Setup.exe` | Installateur NSIS ⇢ recommandé |
+| **Windows** | `*.exe` (portable) | Aucune installation requise |
 | **macOS** | `*.dmg` | Intel x64 ⇢ tourne aussi sur Apple Silicon via Rosetta 2 |
 | **Linux** | `*.AppImage` | Universel, aucune installation |
 | **Linux** | `*.deb` | Debian / Ubuntu |

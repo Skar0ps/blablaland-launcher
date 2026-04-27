@@ -2,16 +2,19 @@ const { app, BrowserWindow, Menu, MenuItem, shell, dialog, screen } = require('e
 const path = require('path');
 const fs = require('fs');
 
-// const GAME_URL = 'https://blablaland-site.test';
-const GAME_URL = 'https://beta.blablastrae.com';
+const GAME_URL = process.env.GAME_URL || 'https://beta.blablastrae.com';
 
 const GAME_ORIGIN = new URL(GAME_URL).origin;
 const GAME_DOMAIN = 'blablastrae.com';
 
 const isGameUrl = (url) => {
   try {
-    const host = new URL(url).hostname;
-    return host === GAME_DOMAIN || host.endsWith('.' + GAME_DOMAIN);
+    const parsed = new URL(url);
+    const host = parsed.hostname;
+    const origin = parsed.origin;
+    return origin === GAME_ORIGIN
+      || host === GAME_DOMAIN
+      || host.endsWith('.' + GAME_DOMAIN);
   } catch {
     return false;
   }
@@ -191,11 +194,11 @@ if (!gotTheLock) {
     mainWindow.on('close', () => saveWindowState(mainWindow));
 
     mainWindow.webContents.on('did-start-loading', () => {
-      mainWindow.setProgressBar(2); // mode indéterminé (animation pulsante)
+      mainWindow.setProgressBar(2);
     });
 
     mainWindow.webContents.on('did-stop-loading', () => {
-      mainWindow.setProgressBar(-1); // retire la barre
+      mainWindow.setProgressBar(-1);
     });
 
     mainWindow.once('ready-to-show', () => {

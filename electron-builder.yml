@@ -15,6 +15,7 @@ files:
   - "index.js"
   - "package.json"
   - "assets"
+  - "!node_modules"
   - "!**/*.map"
   - "!**/*.d.ts"
   - "!**/*.md"
@@ -40,11 +41,9 @@ win:
     - target: "nsis"
       arch:
         - x64
-        - ia32
     - target: "portable"
       arch:
         - x64
-        - ia32
   icon: "build/icon.ico"
 
 linux:

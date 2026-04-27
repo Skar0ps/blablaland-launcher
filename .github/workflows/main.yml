@@ -65,17 +65,18 @@ jobs:
           yarn electron-builder --mac dmg --x64 --publish never \
             --prepackaged "release/mac/Blablastrae Launcher.app"
 
-      - name: Creer le script d'installation macOS
+      - name: Creer le bundle macOS (DMG + script + lisez-moi)
         run: |
           chmod +x "build/Installer Blablastrae.command"
-          cd build && zip "../release/Installer-Blablastrae-macOS.zip" "Installer Blablastrae.command" "LISEZ_MOI_IMPORTANT.txt"
+          zip -j "release/Blablastrae-Launcher-macOS.zip" \
+            release/*.dmg \
+            "build/Installer Blablastrae.command" \
+            "build/LISEZ_MOI.txt"
 
       - name: Publish macOS to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
-          files: |
-            release/*.dmg
-            release/Installer-Blablastrae-macOS.zip
+          files: release/Blablastrae-Launcher-macOS.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
