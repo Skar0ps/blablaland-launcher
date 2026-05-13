@@ -1,0 +1,32 @@
+appId: "com.blablastrae.dev2"
+
+electronLanguages:
+  - fr
+
+directories:
+  output: "release-dev"
+  buildResources: "build"
+
+compression: "store"
+
+files:
+  - "index.js"
+  - "package.json"
+  - "assets"
+  - "!node_modules"
+  - "!**/*.map"
+  - "!**/*.d.ts"
+  - "!**/*.md"
+
+extraResources:
+  - from: "plugins/${os}/${arch}"
+    to: "plugins"
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: "portable"
+      arch:
+        - x64
+  icon: "build/icon.ico"

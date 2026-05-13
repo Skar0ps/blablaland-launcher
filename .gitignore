@@ -136,3 +136,5 @@ dist
 .pnp.*
 
 release/*
+release-dev/*
+dev.config.json

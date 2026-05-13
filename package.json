@@ -32,7 +32,8 @@
     "start:local": "cross-env GAME_URL=http://blablaland-site.test electron .",
     "package": "electron-builder --publish never",
     "release": "electron-builder --publish always",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "dist:dev": "node scripts/dev-build.js"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",

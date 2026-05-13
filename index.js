@@ -2,10 +2,15 @@ const { app, BrowserWindow, Menu, MenuItem, shell, dialog, screen } = require('e
 const path = require('path');
 const fs = require('fs');
 
-const GAME_URL = process.env.GAME_URL || 'https://beta.blablastrae.com';
+const _devConfig = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'dev.config.json'), 'utf8')); }
+  catch { return {}; }
+})();
+const GAME_URL = process.env.GAME_URL || _devConfig.gameUrl || 'https://beta.blablastrae.com';
 
 const GAME_ORIGIN = new URL(GAME_URL).origin;
 const GAME_DOMAIN = 'blablastrae.com';
+
 
 const isGameUrl = (url) => {
   try {
