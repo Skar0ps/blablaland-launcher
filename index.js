@@ -159,17 +159,12 @@ if (!gotTheLock) {
       show: false,
       ...centerOnCurrentDisplay(512, 512),
       icon: path.join(__dirname, 'build/icon.png'),
-      webPreferences: { devTools: false }
+      webPreferences: { devTools: false, sandbox: true }
     });
     splashWindow.loadFile(path.join(__dirname, 'assets/splash.html'));
     splashWindow.once('ready-to-show', () => {
+      splashStartTime = Date.now();
       splashWindow.show();
-      setTimeout(() => {
-        if (splashWindow && !splashWindow.isDestroyed()) {
-          splashStartTime = Date.now();
-          splashWindow.webContents.executeJavaScript('document.body.classList.add("animate")');
-        }
-      }, 100);
     });
   };
 
@@ -188,11 +183,12 @@ if (!gotTheLock) {
       autoHideMenuBar: true,
       webPreferences: {
         contextIsolation: true,
+        sandbox: true,
         plugins: true,
-        devTools: isDev,  
+        devTools: isDev,
         nodeIntegration: false,
         enableRemoteModule: false,
-        safeDialogs: true
+        safeDialogs: true,
       },
     });
 
@@ -331,19 +327,12 @@ if (!gotTheLock) {
             icon: path.join(__dirname, 'build/icon.png'),
             webPreferences: {
               contextIsolation: true,
+              sandbox: true,
               nodeIntegration: false,
               enableRemoteModule: false,
               plugins: true,
               devTools: isDev
             }
-          });
-          newWin.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
-            callback({
-              requestHeaders: {
-                ...details.requestHeaders,
-                'User-Agent': details.requestHeaders['User-Agent'] + ' BlablaLauncher/1.0'
-              }
-            });
           });
           attachContextMenu(newWin);
           newWin.loadURL(url);
@@ -406,6 +395,8 @@ if (!gotTheLock) {
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
   });
+
+  app.applicationMenu = null;
 
   initializeFlashPlugin();
 

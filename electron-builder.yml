@@ -19,6 +19,7 @@ files:
   - "!**/*.map"
   - "!**/*.d.ts"
   - "!**/*.md"
+  - "!LICENSES.chromium.html"
 
 extraResources:
   - from: "plugins/${os}/${arch}"
