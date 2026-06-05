@@ -12,10 +12,18 @@ directories:
 compression: "maximum"
 
 files:
+  # On liste explicitement nos fichiers applicatifs.
+  # Les dépendances de prod (ex: electron-context-menu) sont embarquées
+  # automatiquement par electron-builder depuis node_modules : il ne FAUT PAS
+  # exclure node_modules ici, sinon le require() crashe dans le build packagé.
   - "index.js"
+  - "preload.js"
   - "package.json"
   - "assets"
-  - "!node_modules"
+  # Icônes utilisées au runtime comme icône de fenêtre (BrowserWindow icon:).
+  # buildResources ne copie PAS build/ dans l'app packagée, il faut l'inclure ici.
+  - "build/icon.png"
+  - "build/icon.ico"
   - "!**/*.map"
   - "!**/*.d.ts"
   - "!**/*.md"
