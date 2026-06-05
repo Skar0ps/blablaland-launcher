@@ -1,6 +1,14 @@
-const { app, BrowserWindow, Menu, MenuItem, shell, dialog, screen } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog, screen } = require('electron');
+const contextMenu = require('electron-context-menu');
 const path = require('path');
 const fs = require('fs');
+
+// Chemin du preload partagé par toutes les fenêtres (pont site <-> natif)
+const PRELOAD_PATH = path.join(__dirname, 'preload.js');
+
+// Canal IPC : Ctrl+F intercepté côté natif -> demande au site d'ouvrir sa barre
+// de recherche (la recherche elle-même est faite en JS dans la page).
+const FIND_OPEN_REQUEST = 'launcher:find-open-request';
 
 const _devConfig = (() => {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'dev.config.json'), 'utf8')); }
@@ -122,6 +130,78 @@ if (!gotTheLock) {
     Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
   };
 
+  /**
+   * context menu contextuel (copier/coller/lien/image) et raccourci Ctrl+F.
+   * appelée sur chaque BrowserWindow
+   * @param {BrowserWindow} win
+   */
+  const enhanceWindow = (win) => {
+    const webContents = win.webContents;
+
+    contextMenu({
+      window: win,
+      // Flash exempté : on ne remplace pas le menu natif du plugin Flash
+      shouldShowMenu: (_event, params) => params.mediaType !== 'plugin',
+      showCopyImage: true,
+      showCopyImageAddress: true,
+      showSaveImageAs: true,
+      showInspectElement: isDev,
+      // bouton custom vers le Wiktionnaire (dictionnaire FR libre), ajouté via prepend plutot que google.
+      showSearchWithGoogle: false,
+      prepend: (_defaultActions, params) => {
+        const selection = (params.selectionText || '').trim();
+        if (!selection) {
+          return [];
+        }
+        // on limite à un mot/expression court pour que ça ait du sens en dico.
+        const query = encodeURIComponent(selection);
+        return [
+          {
+            label: `Rechercher « ${selection.length > 30 ? selection.slice(0, 30) + '…' : selection} » dans le dictionnaire`,
+            click: () => {
+              shell.openExternal(`https://fr.wiktionary.org/wiki/${query}`);
+            },
+          },
+          { type: 'separator' },
+        ];
+      },
+      labels: {
+        copy: 'Copier',
+        cut: 'Couper',
+        paste: 'Coller',
+        selectAll: 'Tout sélectionner',
+        copyLink: "Copier l'adresse du lien",
+        copyImage: "Copier l'image",
+        copyImageAddress: "Copier l'adresse de l'image",
+        saveImageAs: "Enregistrer l'image sous…",
+        inspect: 'Inspecter',
+        learnSpelling: "Apprendre l'orthographe",
+      },
+      // Options custom ajoutées en bas du menu (recharger / zoom)
+      append: () => [
+        { type: 'separator' },
+        { role: 'reload', label: 'Recharger la page' },
+        { role: 'forceReload', label: 'Forcer le rechargement' },
+        { type: 'separator' },
+        { role: 'resetZoom', label: 'Réinitialiser le zoom' },
+        { role: 'zoomIn', label: 'Zoomer' },
+        { role: 'zoomOut', label: 'Dézoomer' },
+      ],
+    });
+
+    // Ctrl+F : on intercepte au niveau natif et on demande au site d'ouvrir sa barre de recherche
+    // (findInPage natif vole le focus du champ, bug Electron connu).
+    webContents.on('before-input-event', (event, input) => {
+      const isFind = input.type === 'keyDown'
+        && (input.control || input.meta)
+        && input.key.toLowerCase() === 'f';
+      if (isFind) {
+        event.preventDefault();
+        webContents.send(FIND_OPEN_REQUEST);
+      }
+    });
+  };
+
   const windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 
   const loadWindowState = () => {
@@ -182,6 +262,7 @@ if (!gotTheLock) {
       show: false,
       autoHideMenuBar: true,
       webPreferences: {
+        preload: PRELOAD_PATH,
         contextIsolation: true,
         sandbox: true,
         plugins: true,
@@ -220,32 +301,7 @@ if (!gotTheLock) {
       }, delay);
     });
 
-    const attachContextMenu = (win) => {
-      win.webContents.on('context-menu', (_event, params) => {
-        const contextMenu = Menu.buildFromTemplate([
-          { role: 'reload', label: "Recharger la page"},
-          { role: 'forceReload', label: "Forcer le rechargement"},
-          { type: 'separator' },
-          { role: 'resetZoom', label: "Réinitialiser zoom"},
-          { role: 'zoomIn', label: "Zoomer"},
-          { role: 'zoomOut', label: "Dézoomer"},
-          { type: 'separator' },
-          { role: 'togglefullscreen', label: 'Plein écran'},
-        ]);
-        if (isDev) {
-          contextMenu.append(new MenuItem({ type: 'separator' }));
-          contextMenu.append(new MenuItem({
-            label: 'Devtools',
-            click: () => {
-              win.webContents.inspectElement(params.x, params.y);
-            }
-          }));
-        }
-        contextMenu.popup(win, params.x, params.y);
-      });
-    };
-
-    attachContextMenu(mainWindow);
+    enhanceWindow(mainWindow);
 
     mainWindow.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
       callback({
@@ -326,6 +382,7 @@ if (!gotTheLock) {
             autoHideMenuBar: true,
             icon: path.join(__dirname, 'build/icon.png'),
             webPreferences: {
+              preload: PRELOAD_PATH,
               contextIsolation: true,
               sandbox: true,
               nodeIntegration: false,
@@ -334,7 +391,7 @@ if (!gotTheLock) {
               devTools: isDev
             }
           });
-          attachContextMenu(newWin);
+          enhanceWindow(newWin);
           newWin.loadURL(url);
         } else if (url.startsWith('https://') || url.startsWith('http://')) {
           confirmAndOpenExternal(url);

@@ -1,6 +1,6 @@
 {
   "name": "blablastrae",
-  "version": "1.6.3",
+  "version": "1.7.0",
   "productName": "Blablastrae Launcher",
   "description": "Launcher Electron avec support Flash pour jouer à Blablastrae.",
   "homepage": "https://skar0ps.dev",
@@ -39,5 +39,8 @@
     "cross-env": "^10.1.0",
     "electron": "^11.5.0",
     "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "electron-context-menu": "^3.6.1"
   }
 }
