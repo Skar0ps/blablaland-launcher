@@ -10,10 +10,15 @@ directories:
 compression: "store"
 
 files:
+  # Mêmes règles que electron-builder.yml : ne PAS exclure node_modules sinon
+  # les deps de prod (electron-context-menu) manquent et le require() crashe.
   - "index.js"
+  - "preload.js"
   - "package.json"
   - "assets"
-  - "!node_modules"
+  # Icônes utilisées au runtime comme icône de fenêtre (BrowserWindow icon:).
+  - "build/icon.png"
+  - "build/icon.ico"
   - "!**/*.map"
   - "!**/*.d.ts"
   - "!**/*.md"
