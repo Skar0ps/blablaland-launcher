@@ -6,10 +6,6 @@ const fs = require('fs');
 // Chemin du preload partagé par toutes les fenêtres (pont site <-> natif)
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 
-// Canal IPC : Ctrl+F intercepté côté natif -> demande au site d'ouvrir sa barre
-// de recherche (la recherche elle-même est faite en JS dans la page).
-const FIND_OPEN_REQUEST = 'launcher:find-open-request';
-
 const _devConfig = (() => {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'dev.config.json'), 'utf8')); }
   catch { return {}; }
@@ -28,6 +24,34 @@ const isGameUrl = (url) => {
     return origin === GAME_ORIGIN
       || host === GAME_DOMAIN
       || host.endsWith('.' + GAME_DOMAIN);
+  } catch {
+    return false;
+  }
+};
+
+// Chemins autorisés à s'afficher DANS le launcher. Tout le reste du site
+// (mon compte, forum, panel animation, inscription…) s'ouvre dans le navigateur
+// par défaut. Le launcher est un client de jeu minimal : entrée + jeu + console.
+const ALLOWED_LAUNCHER_PATHS = [
+  /^\/launcher(\/|$)/,   // point d'entrée + écran de reprise de session
+  /^\/login(\/|$)/,      // POST de connexion (le formulaire d'auth launcher poste ici)
+  /^\/logout(\/|$)/,     // POST de déconnexion
+  /^\/game-light(\/|$)/, // le jeu
+  /^\/console\/view(\/|$)/, // la console (page Flash, reste dans le launcher)
+];
+
+/**
+ * Vrai si l'URL fait partie du domaine du jeu ET d'un chemin autorisé dans le launcher.
+ * @param {string} url
+ * @returns {boolean}
+ */
+const isAllowedInLauncher = (url) => {
+  if (!isGameUrl(url)) {
+    return false;
+  }
+  try {
+    const pathname = new URL(url).pathname;
+    return ALLOWED_LAUNCHER_PATHS.some((pattern) => pattern.test(pathname));
   } catch {
     return false;
   }
@@ -96,29 +120,6 @@ if (!gotTheLock) {
             }
           }
         ]
-      },
-      {
-        label: 'Navigation',
-        submenu: [
-          {
-            label: 'Retour',
-            accelerator: 'Alt+Left',
-            click: (_, focusedWindow) => {
-              if (focusedWindow && focusedWindow.webContents.canGoBack()) {
-                focusedWindow.webContents.goBack();
-              }
-            }
-          },
-          {
-            label: 'Avancer',
-            accelerator: 'Alt+Right',
-            click: (_, focusedWindow) => {
-              if (focusedWindow && focusedWindow.webContents.canGoForward()) {
-                focusedWindow.webContents.goForward();
-              }
-            }
-          }
-        ]
       }
     ];
 
@@ -142,9 +143,6 @@ if (!gotTheLock) {
       window: win,
       // Flash exempté : on ne remplace pas le menu natif du plugin Flash
       shouldShowMenu: (_event, params) => params.mediaType !== 'plugin',
-      showCopyImage: true,
-      showCopyImageAddress: true,
-      showSaveImageAs: true,
       showInspectElement: isDev,
       // bouton custom vers le Wiktionnaire (dictionnaire FR libre), ajouté via prepend plutot que google.
       showSearchWithGoogle: false,
@@ -171,9 +169,6 @@ if (!gotTheLock) {
         paste: 'Coller',
         selectAll: 'Tout sélectionner',
         copyLink: "Copier l'adresse du lien",
-        copyImage: "Copier l'image",
-        copyImageAddress: "Copier l'adresse de l'image",
-        saveImageAs: "Enregistrer l'image sous…",
         inspect: 'Inspecter',
         learnSpelling: "Apprendre l'orthographe",
       },
@@ -187,18 +182,6 @@ if (!gotTheLock) {
         { role: 'zoomIn', label: 'Zoomer' },
         { role: 'zoomOut', label: 'Dézoomer' },
       ],
-    });
-
-    // Ctrl+F : on intercepte au niveau natif et on demande au site d'ouvrir sa barre de recherche
-    // (findInPage natif vole le focus du champ, bug Electron connu).
-    webContents.on('before-input-event', (event, input) => {
-      const isFind = input.type === 'keyDown'
-        && (input.control || input.meta)
-        && input.key.toLowerCase() === 'f';
-      if (isFind) {
-        event.preventDefault();
-        webContents.send(FIND_OPEN_REQUEST);
-      }
     });
   };
 
@@ -358,11 +341,23 @@ if (!gotTheLock) {
       if (choice === 1) shell.openExternal(url);
     };
 
+    // Une page du jeu mais non autorisée dans le launcher (mon compte, forum…)
+    // s'ouvre directement dans le navigateur par défaut, sans dialog (c'est un
+    // lien légitime du site, juste hors périmètre launcher). Un lien hors domaine
+    // garde la confirmation (sécurité).
+    const handleDisallowedUrl = (url) => {
+      if (isGameUrl(url)) {
+        shell.openExternal(url);
+      } else {
+        confirmAndOpenExternal(url);
+      }
+    };
+
     mainWindow.webContents.on('will-navigate', (event, url) => {
       try {
-        if (!isGameUrl(url)) {
+        if (!isAllowedInLauncher(url)) {
           event.preventDefault();
-          confirmAndOpenExternal(url);
+          handleDisallowedUrl(url);
         }
       } catch (e) {
         event.preventDefault();
@@ -372,7 +367,8 @@ if (!gotTheLock) {
     mainWindow.webContents.on('new-window', (event, url) => {
       event.preventDefault();
       try {
-        if (isGameUrl(url)) {
+        if (isAllowedInLauncher(url)) {
+          // Page autorisée (console notamment) → nouvelle fenêtre dans le launcher.
           const { bounds } = screen.getDisplayMatching(mainWindow.getBounds());
           const newWin = new BrowserWindow({
             width: 1024,
@@ -394,13 +390,15 @@ if (!gotTheLock) {
           enhanceWindow(newWin);
           newWin.loadURL(url);
         } else if (url.startsWith('https://') || url.startsWith('http://')) {
-          confirmAndOpenExternal(url);
+          // Tout le reste (pages du site hors périmètre, liens externes) → navigateur.
+          handleDisallowedUrl(url);
         }
       } catch (e) {
       }
     });
 
-    mainWindow.loadURL(GAME_URL);
+    // Le launcher démarre sur son point d'entrée (auth ou reprise de session).
+    mainWindow.loadURL(GAME_URL.replace(/\/+$/, '') + '/launcher');
 
     if (isDev) mainWindow.webContents.openDevTools();
   };
@@ -452,8 +450,6 @@ if (!gotTheLock) {
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
   });
-
-  app.applicationMenu = null;
 
   initializeFlashPlugin();
 

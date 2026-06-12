@@ -46,6 +46,9 @@ mac:
   identity: null
 
 win:
+  icon: "build/icon.ico"
+  # Noms d'artefacts normalisés (sans espace) pour des URLs de téléchargement
+  # prévisibles côté site (cf. game.blade.php + LAUNCHER_VERSION).
   target:
     - target: "nsis"
       arch:
@@ -53,7 +56,12 @@ win:
     - target: "portable"
       arch:
         - x64
-  icon: "build/icon.ico"
+
+nsis:
+  artifactName: "Blablastrae-Launcher-Setup-${version}.${ext}"
+
+portable:
+  artifactName: "Blablastrae-Launcher-Portable-${version}.${ext}"
 
 linux:
   icon: "build/icon.png"
@@ -67,6 +75,15 @@ linux:
     - target: "rpm"
       arch:
         - x64
+
+appImage:
+  artifactName: "Blablastrae-Launcher-${version}.${ext}"
+
+deb:
+  artifactName: "blablastrae-launcher_${version}_amd64.${ext}"
+
+rpm:
+  artifactName: "blablastrae-launcher-${version}.x86_64.${ext}"
 
 protocols:
   - name: "blablastrae"
