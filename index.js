@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell, dialog, screen } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog, screen, ipcMain } = require('electron');
 const contextMenu = require('electron-context-menu');
 const path = require('path');
 const fs = require('fs');
@@ -449,6 +449,15 @@ if (!gotTheLock) {
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
+  });
+
+  // Ouverture d'une URL dans le navigateur par défaut, demandée par le site
+  // (handoff de session : Mon compte / Panel). On valide que l'URL appartient
+  // bien au domaine du jeu avant d'ouvrir, par sécurité.
+  ipcMain.handle('launcher:open-external', (_event, url) => {
+    if (typeof url === 'string' && isGameUrl(url)) {
+      shell.openExternal(url);
+    }
   });
 
   initializeFlashPlugin();

@@ -2,7 +2,7 @@
 // Seul pont autorisé entre le site (Chromium 87) et le natif Electron grâce à
 // contextIsolation. On expose une petite API minimale via contextBridge.
 
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 /**
  * API exposée au site sous window.blablaLauncher.
@@ -12,4 +12,14 @@ const { contextBridge } = require('electron');
 contextBridge.exposeInMainWorld('blablaLauncher', {
     // Indique au site qu'il tourne bien dans le launcher
     isLauncher: true,
+
+    /**
+     * Ouvre une URL dans le navigateur par défaut (le natif valide l'URL).
+     * Utilisé pour le handoff de session (Mon compte / Panel) : le site fetch un
+     * lien de connexion signé puis demande au launcher de l'ouvrir.
+     * @param {string} url
+     */
+    openExternal(url) {
+        ipcRenderer.invoke('launcher:open-external', url);
+    },
 });
