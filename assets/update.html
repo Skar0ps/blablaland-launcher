@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Mise à jour - Blablastrae</title>
+    <style>
+        :root {
+            --bg: rgba(20, 22, 26, 0.96);
+            --card: #23262d;
+            --text: #f5f5f5;
+            --muted: #a8b0bd;
+            --accent: #6b8cff;
+            --accent-hover: #5577f0;
+            --track: #3a3f48;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            height: 100vh;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            /* Backdrop : fond assombri plein écran */
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        .update-box {
+            text-align: center;
+            max-width: 520px;
+            padding: 40px 32px;
+        }
+
+        .lock-icon {
+            font-size: 72px;
+            line-height: 1;
+            margin-bottom: 24px;
+        }
+
+        .update-message {
+            font-size: 17px;
+            line-height: 1.5;
+            margin: 0 0 28px;
+            color: var(--text);
+        }
+
+        .versions {
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .update-btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .update-btn:hover:not(:disabled) {
+            background: var(--accent-hover);
+        }
+
+        .update-btn:disabled {
+            opacity: 0.6;
+            cursor: default;
+        }
+
+        .later-btn {
+            display: block;
+            margin: 16px auto 0;
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .later-btn:hover {
+            color: var(--text);
+        }
+
+        /* Barre de progression (cas natif : NSIS / AppImage) */
+        .progress-wrap {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .progress-wrap.visible {
+            display: block;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 10px;
+            background: var(--track);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--accent);
+            transition: width 0.2s ease;
+        }
+
+        .progress-label {
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .mac-steps {
+            display: none;
+            margin-top: 24px;
+            text-align: left;
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.6;
+            background: var(--card);
+            border-radius: 10px;
+            padding: 16px 20px;
+        }
+
+        .mac-steps.visible {
+            display: block;
+        }
+
+        .error-msg {
+            display: none;
+            margin-top: 18px;
+            color: #ff8b8b;
+            font-size: 14px;
+        }
+
+        .error-msg.visible {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="update-box">
+        <div class="lock-icon" id="icon">🔒</div>
+
+        <p class="update-message" id="message">Vérification de la version…</p>
+
+        <button type="button" class="update-btn" id="update-btn" style="display:none;">
+            Télécharger la dernière version
+        </button>
+
+        <button type="button" class="later-btn" id="later-btn" style="display:none;">
+            Plus tard
+        </button>
+
+        <div class="progress-wrap" id="progress-wrap">
+            <div class="progress-track">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="progress-label" id="progress-label">Téléchargement… 0%</div>
+        </div>
+
+        <div class="mac-steps" id="mac-steps">
+            <strong>Pour finaliser sur macOS :</strong><br>
+            1. Ouvre le .dmg téléchargé et glisse l'app dans Applications.<br>
+            2. Double-clique sur « Installer Blablastrae.command » et entre ton mot de passe.<br>
+            3. Le launcher se relance automatiquement.
+        </div>
+
+        <p class="error-msg" id="error-msg"></p>
+    </div>
+
+    <script>
+        (async function () {
+            const iconEl = document.getElementById('icon');
+            const messageEl = document.getElementById('message');
+            const updateBtn = document.getElementById('update-btn');
+            const laterBtn = document.getElementById('later-btn');
+            const progressWrap = document.getElementById('progress-wrap');
+            const progressBar = document.getElementById('progress-bar');
+            const progressLabel = document.getElementById('progress-label');
+            const macSteps = document.getElementById('mac-steps');
+            const errorMsg = document.getElementById('error-msg');
+
+            const status = await window.launcherUpdater.getStatus();
+
+            // Cadenas pour une MAJ obligatoire, flèche pour une MAJ optionnelle.
+            iconEl.textContent = status.mandatory ? '🔒' : '⬆️';
+
+            if (status.mandatory) {
+                messageEl.innerHTML =
+                    'Ta version du launcher est inférieure à la version minimum requise pour accéder au jeu '
+                    + '(<span class="versions">' + status.currentVersion + ' &lt; ' + status.minimumVersion + '</span>), '
+                    + 'télécharge la nouvelle version pour pouvoir jouer !';
+            } else {
+                messageEl.innerHTML =
+                    'Une nouvelle version du launcher est disponible '
+                    + '(<span class="versions">' + status.currentVersion + ' → ' + status.latestVersion + '</span>).';
+                // Une MAJ optionnelle peut être reportée.
+                laterBtn.style.display = 'block';
+            }
+
+            updateBtn.style.display = 'inline-block';
+
+            window.launcherUpdater.onProgress(function (percent) {
+                progressWrap.classList.add('visible');
+                progressBar.style.width = percent + '%';
+                progressLabel.textContent = 'Téléchargement… ' + percent + '%';
+            });
+
+            window.launcherUpdater.onError(function (msg) {
+                errorMsg.textContent = 'Erreur : ' + msg;
+                errorMsg.classList.add('visible');
+                updateBtn.disabled = false;
+                updateBtn.textContent = 'Réessayer';
+            });
+
+            updateBtn.addEventListener('click', async function () {
+                updateBtn.disabled = true;
+                errorMsg.classList.remove('visible');
+
+                const result = await window.launcherUpdater.startUpdate();
+
+                if (result && result.mode === 'external') {
+                    // Portable / macOS : le téléchargement s'ouvre dans le navigateur.
+                    updateBtn.textContent = 'Téléchargement ouvert dans le navigateur';
+                    if (status.buildType === 'mac') {
+                        macSteps.classList.add('visible');
+                    }
+                } else {
+                    // Natif : la barre de progression prend le relais, puis relance auto.
+                    updateBtn.textContent = 'Mise à jour en cours…';
+                }
+            });
+
+            laterBtn.addEventListener('click', function () {
+                // MAJ optionnelle reportée : on demande au natif de continuer vers le jeu.
+                window.launcherUpdater.dismissOptional();
+            });
+        })();
+    </script>
+</body>
+
+</html>

@@ -18,6 +18,7 @@ files:
   # exclure node_modules ici, sinon le require() crashe dans le build packagé.
   - "index.js"
   - "preload.js"
+  - "updater.js"
   - "package.json"
   - "assets"
   # Icônes utilisées au runtime comme icône de fenêtre (BrowserWindow icon:).
@@ -89,3 +90,12 @@ protocols:
   - name: "blablastrae"
     schemes:
       - "blablastrae-desktop"
+
+# Provider de mise à jour : indique à electron-builder de générer les métadonnées
+# (latest.yml / latest-linux.yml) pointant vers les releases GitHub. electron-updater
+# les lit au runtime pour détecter et télécharger les nouvelles versions.
+# Le build reste en --publish never ; ce sont les yml + artefacts qui sont uploadés par le CI.
+publish:
+  - provider: "github"
+    owner: "Skar0ps"
+    repo: "blablaland-launcher"

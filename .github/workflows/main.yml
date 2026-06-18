@@ -23,20 +23,20 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build Windows (NSIS + Portable) & Linux (AppImage + deb + rpm)
-        run: yarn package --win --linux
-
-      - name: Publish Windows & Linux to GitHub Release
+      # --publish always : electron-builder publie lui-même artefacts ET métadonnées
+      # (latest.yml / latest-linux.yml requis par electron-updater). Ces yml ne sont PAS
+      # générés avec --publish never, d'où le passage à always (le provider github est
+      # déclaré dans electron-builder.yml). Sur tag uniquement, sinon build local sans publish.
+      - name: Build & Publish Windows (NSIS + Portable) & Linux (AppImage + deb + rpm)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v3
-        with:
-          files: |
-            release/*.exe
-            release/*.AppImage
-            release/*.deb
-            release/*.rpm
+        run: yarn release --win --linux
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Hors tag (workflow_dispatch sur une branche) : build seul, sans publication.
+      - name: Build only (no publish, non-tag runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: yarn package --win --linux
 
   build_macos:
     name: Build for macOS

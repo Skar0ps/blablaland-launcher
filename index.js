@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, shell, dialog, screen, ipcMain } = require('el
 const contextMenu = require('electron-context-menu');
 const path = require('path');
 const fs = require('fs');
+const updater = require('./updater');
 
 // Chemin du preload partagé par toutes les fenêtres (pont site <-> natif)
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
@@ -241,7 +242,40 @@ if (!gotTheLock) {
       mainWindowRef.restore();
     }
     mainWindowRef.focus();
-    mainWindowRef.loadURL(GAME_URL.replace(/\/+$/, '') + '/launcher');
+    // On repasse par loadStartPage : un deep link ne doit jamais contourner une MAJ obligatoire.
+    loadStartPage();
+  };
+
+  // Dernier état de mise à jour calculé (partagé avec les handlers IPC de update.html).
+  let updateStatus = null;
+
+  /**
+   * Charge le point d'entrée du jeu (/launcher), qui décide auth vs reprise de session.
+   */
+  const loadGame = () => {
+    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+      mainWindowRef.loadURL(GAME_URL.replace(/\/+$/, '') + '/launcher');
+    }
+  };
+
+  /**
+   * Vérifie la version au démarrage puis charge la bonne page :
+   * - MAJ obligatoire OU optionnelle disponible -> écran de mise à jour (update.html)
+   * - sinon (ou check en échec) -> le jeu directement (on ne bloque jamais sur une erreur réseau)
+   */
+  const loadStartPage = async () => {
+    if (!mainWindowRef || mainWindowRef.isDestroyed()) {
+      return;
+    }
+    updateStatus = await updater.checkForUpdate(GAME_URL);
+
+    // En cas d'échec du check (réseau, site down), on laisse passer vers le jeu :
+    // mieux vaut un launcher utilisable qu'un blocage sur une erreur transitoire.
+    if (updateStatus.ok && updateStatus.updateAvailable) {
+      mainWindowRef.loadFile(path.join(__dirname, 'assets/update.html'));
+      return;
+    }
+    loadGame();
   };
 
   const centerOnCurrentDisplay = (width, height) => {
@@ -331,7 +365,7 @@ if (!gotTheLock) {
       callback({
         requestHeaders: {
           ...details.requestHeaders,
-          'User-Agent': details.requestHeaders['User-Agent'] + ' BlablaLauncher/1.0'
+          'User-Agent': details.requestHeaders['User-Agent'] + ' BlablaLauncher/' + app.getVersion()
         }
       });
     });
@@ -438,8 +472,8 @@ if (!gotTheLock) {
       }
     });
 
-    // Le launcher démarre sur son point d'entrée (auth ou reprise de session).
-    mainWindow.loadURL(GAME_URL.replace(/\/+$/, '') + '/launcher');
+    // Au démarrage : vérifie d'abord la version (écran de MAJ si besoin), sinon charge le jeu.
+    loadStartPage();
 
     if (isDev) mainWindow.webContents.openDevTools();
   };
@@ -513,6 +547,40 @@ if (!gotTheLock) {
     if (typeof url === 'string' && isGameUrl(url)) {
       shell.openExternal(url);
     }
+  });
+
+  // --- Auto-updater : canaux consommés par assets/update.html via le preload ---
+
+  // Renvoie l'état de MAJ calculé au démarrage (versions, obligatoire ou non, type de build).
+  ipcMain.handle('updater:get-status', () => updateStatus);
+
+  // Lance la mise à jour. Relaie progression/erreur (cas natif NSIS/AppImage) vers la page.
+  ipcMain.handle('updater:start', async () => {
+    if (!updateStatus || !updateStatus.ok) {
+      return { mode: 'external' };
+    }
+    return updater.startUpdate({
+      latestVersion: updateStatus.latestVersion,
+      onProgress: (percent) => {
+        if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+          mainWindowRef.webContents.send('updater:progress', percent);
+        }
+      },
+      onError: (message) => {
+        if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+          mainWindowRef.webContents.send('updater:error', message);
+        }
+      },
+    });
+  });
+
+  // MAJ optionnelle reportée : on continue vers le jeu. Ignoré si la MAJ est obligatoire
+  // (garde-fou : la page n'affiche pas "plus tard" dans ce cas, mais on double-vérifie ici).
+  ipcMain.handle('updater:dismiss-optional', () => {
+    if (updateStatus && updateStatus.mandatory) {
+      return;
+    }
+    loadGame();
   });
 
   // Enregistre le launcher comme handler du scheme blablastrae-desktop:// auprès de l'OS.
