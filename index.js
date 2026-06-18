@@ -59,6 +59,23 @@ const isAllowedInLauncher = (url) => {
 
 const isDev = !app.isPackaged;
 
+// Custom URI scheme du launcher (déclaré dans electron-builder.yml, schemes: blablastrae-desktop).
+// La page game du site ouvre "blablastrae-desktop://play" pour lancer le jeu directement.
+const PROTOCOL_SCHEME = 'blablastrae-desktop';
+
+/**
+ * Cherche dans une liste d'arguments (process.argv ou second-instance) le premier
+ * argument qui est une URL de notre scheme. Retourne l'URL ou null.
+ * @param {string[]} argv
+ * @returns {string|null}
+ */
+const findDeepLinkInArgv = (argv) => {
+  if (!Array.isArray(argv)) {
+    return null;
+  }
+  return argv.find((arg) => typeof arg === 'string' && arg.startsWith(PROTOCOL_SCHEME + '://')) || null;
+};
+
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
@@ -203,6 +220,29 @@ if (!gotTheLock) {
 
   let splashWindow;
   let splashStartTime;
+  // Référence à la fenêtre principale, pour router les deep links dessus (et pas sur le splash,
+  // qui peut être la seule fenêtre existante au moment où un deep link arrive au démarrage).
+  let mainWindowRef = null;
+
+  /**
+   * Route une URL de deep link entrante vers la fenêtre principale du launcher.
+   * Toute URL de notre scheme mène au point d'entrée /launcher (qui décide jeu direct
+   * si connecté, sinon écran de connexion). On valide le scheme avant d'agir.
+   * @param {string} url
+   */
+  const handleDeepLink = (url) => {
+    if (typeof url !== 'string' || !url.startsWith(PROTOCOL_SCHEME + '://')) {
+      return;
+    }
+    if (!mainWindowRef || mainWindowRef.isDestroyed()) {
+      return;
+    }
+    if (mainWindowRef.isMinimized()) {
+      mainWindowRef.restore();
+    }
+    mainWindowRef.focus();
+    mainWindowRef.loadURL(GAME_URL.replace(/\/+$/, '') + '/launcher');
+  };
 
   const centerOnCurrentDisplay = (width, height) => {
     const { bounds } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
@@ -256,6 +296,7 @@ if (!gotTheLock) {
       },
     });
 
+    mainWindowRef = mainWindow;
     mainWindow.on('close', () => saveWindowState(mainWindow));
 
     mainWindow.webContents.on('did-start-loading', () => {
@@ -439,12 +480,26 @@ if (!gotTheLock) {
     app.commandLine.appendSwitch('ppapi-flash-version', '32.0.0.465');
   };
 
-  app.on('second-instance', () => {
+  // Windows/Linux : quand une instance tourne déjà, un nouveau lancement (ex. clic sur
+  // blablastrae-desktop://play) transmet ses arguments ici. On parse le deep link s'il y en a un.
+  app.on('second-instance', (_event, argv) => {
+    const deepLink = findDeepLinkInArgv(argv);
+    if (deepLink) {
+      handleDeepLink(deepLink);
+      return;
+    }
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
+  });
+
+  // macOS : le deep link n'arrive pas dans argv mais via cet event (peut survenir
+  // avant ou après whenReady). preventDefault pour signaler qu'on le gère nous-mêmes.
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    handleDeepLink(url);
   });
 
   app.on('window-all-closed', () => {
@@ -460,12 +515,29 @@ if (!gotTheLock) {
     }
   });
 
+  // Enregistre le launcher comme handler du scheme blablastrae-desktop:// auprès de l'OS.
+  // En production l'enregistrement vient surtout de l'installeur (electron-builder), mais cet
+  // appel couvre le mode portable et garantit l'enregistrement au 1er run. Sous Windows en dev
+  // (non packagé), il faut passer execPath + le script pour que l'OS sache quoi relancer.
+  if (process.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(PROTOCOL_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+  } else {
+    app.setAsDefaultProtocolClient(PROTOCOL_SCHEME);
+  }
+
   initializeFlashPlugin();
 
   app.whenReady().then(() => {
     createMenu();
     createSplashWindow();
     createWindow();
+
+    // Cold start Windows/Linux : si le launcher a été lancé via le protocole (URL dans argv),
+    // on route une fois la fenêtre créée. (Sans deep link, createWindow charge déjà /launcher.)
+    const initialDeepLink = findDeepLinkInArgv(process.argv);
+    if (initialDeepLink) {
+      handleDeepLink(initialDeepLink);
+    }
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
