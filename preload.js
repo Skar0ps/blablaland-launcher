@@ -1,22 +1,15 @@
-// Preload exécuté dans chaque fenêtre du launcher AVANT le chargement de la page.
-// Seul pont autorisé entre le site (Chromium 87) et le natif Electron grâce à
-// contextIsolation. On expose une petite API minimale via contextBridge.
-
 const { contextBridge, ipcRenderer } = require('electron');
 
 /**
  * API exposée au site sous window.blablaLauncher.
- * Le site sait ainsi qu'il tourne dans le launcher (sur un navigateur classique
- * l'objet n'existe pas).
+ * Permet au site de savoir qu'il tourne dans le launcher (l'objet n'existe pas dans un navigateur normal).
  */
 contextBridge.exposeInMainWorld('blablaLauncher', {
-    // Indique au site qu'il tourne bien dans le launcher
     isLauncher: true,
 
     /**
-     * Ouvre une URL dans le navigateur par défaut (le natif valide l'URL).
-     * Utilisé pour le handoff de session (Mon compte / Panel) : le site fetch un
-     * lien de connexion signé puis demande au launcher de l'ouvrir.
+     * Ouvre une URL dans le navigateur par défaut.
+     * Utilisé pour le handoff de session (mon compte, panel admin) depuis le launcher.
      * @param {string} url
      */
     openExternal(url) {
@@ -25,47 +18,36 @@ contextBridge.exposeInMainWorld('blablaLauncher', {
 });
 
 /**
- * API de l'auto-updater, exposée à la page de mise à jour locale (update.html).
- * Le natif gère tout le travail (réseau, electron-updater, relance) ; la page ne fait
- * qu'afficher l'état et déclencher les actions.
+ * API de mise à jour exposée à update.html.
+ * Le natif gère le réseau et l'installation ; la page ne fait qu'afficher et déclencher.
  */
 contextBridge.exposeInMainWorld('launcherUpdater', {
-    /**
-     * Récupère l'état de mise à jour calculé par le natif (versions, obligatoire ou non).
-     * @returns {Promise<object>}
-     */
+    /** Récupère l'état de MAJ calculé au démarrage (version, obligatoire ou non). */
     getStatus() {
         return ipcRenderer.invoke('updater:get-status');
     },
 
-    /**
-     * Démarre la mise à jour (download + relance auto sur NSIS/AppImage, ou téléchargement
-     * navigateur sur portable/macOS).
-     * @returns {Promise<object>}
-     */
+    /** Lance le téléchargement et l'installation. */
     startUpdate() {
         return ipcRenderer.invoke('updater:start');
     },
 
-    /**
-     * Ignore une mise à jour OPTIONNELLE et continue vers le jeu. Sans effet pour une MAJ
-     * obligatoire (le natif ne charge pas le jeu tant que pas à jour).
-     */
+    /** Ignore une MAJ optionnelle et continue vers le jeu. Sans effet si la MAJ est obligatoire. */
     dismissOptional() {
         return ipcRenderer.invoke('updater:dismiss-optional');
     },
 
     /**
-     * Abonne un callback à la progression du téléchargement (0-100), cas natif uniquement.
-     * @param {(percent:number)=>void} callback
+     * Abonne un callback à la progression du téléchargement (0–100).
+     * @param {(percent: number) => void} callback
      */
     onProgress(callback) {
         ipcRenderer.on('updater:progress', (_event, percent) => callback(percent));
     },
 
     /**
-     * Abonne un callback aux erreurs de mise à jour.
-     * @param {(message:string)=>void} callback
+     * Abonne un callback aux erreurs de téléchargement.
+     * @param {(message: string) => void} callback
      */
     onError(callback) {
         ipcRenderer.on('updater:error', (_event, message) => callback(message));

@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const updater = require('./updater');
 
-// Chemin du preload partagé par toutes les fenêtres (pont site <-> natif)
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 
 const _devConfig = (() => {
@@ -30,22 +29,15 @@ const isGameUrl = (url) => {
   }
 };
 
-// Chemins autorisés à s'afficher DANS le launcher. Tout le reste du site
-// (mon compte, forum, panel animation, inscription…) s'ouvre dans le navigateur
-// par défaut. Le launcher est un client de jeu minimal : entrée + jeu + console.
+// tout le reste du site s'ouvre dans le navigateur par défaut (voir handleDisallowedUrl)
 const ALLOWED_LAUNCHER_PATHS = [
-  /^\/launcher(\/|$)/,   // point d'entrée + écran de reprise de session
-  /^\/login(\/|$)/,      // POST de connexion (le formulaire d'auth launcher poste ici)
-  /^\/logout(\/|$)/,     // POST de déconnexion
-  /^\/game-light(\/|$)/, // le jeu
-  /^\/console\/view(\/|$)/, // la console (page Flash, reste dans le launcher)
+  /^\/launcher(\/|$)/,      // entrée + reprise de session
+  /^\/login(\/|$)/,         // auth
+  /^\/logout(\/|$)/,        // déconnexion
+  /^\/game-light(\/|$)/,    // le jeu
+  /^\/console\/view(\/|$)/, // console flash
 ];
 
-/**
- * Vrai si l'URL fait partie du domaine du jeu ET d'un chemin autorisé dans le launcher.
- * @param {string} url
- * @returns {boolean}
- */
 const isAllowedInLauncher = (url) => {
   if (!isGameUrl(url)) {
     return false;
@@ -60,16 +52,9 @@ const isAllowedInLauncher = (url) => {
 
 const isDev = !app.isPackaged;
 
-// Custom URI scheme du launcher (déclaré dans electron-builder.yml, schemes: blablastrae-desktop).
-// La page game du site ouvre "blablastrae-desktop://play" pour lancer le jeu directement.
+// déclaré dans electron-builder.yml (schemes), la page game du site l'utilise pour lancer le jeu
 const PROTOCOL_SCHEME = 'blablastrae-desktop';
 
-/**
- * Cherche dans une liste d'arguments (process.argv ou second-instance) le premier
- * argument qui est une URL de notre scheme. Retourne l'URL ou null.
- * @param {string[]} argv
- * @returns {string|null}
- */
 const findDeepLinkInArgv = (argv) => {
   if (!Array.isArray(argv)) {
     return null;
@@ -149,11 +134,6 @@ if (!gotTheLock) {
     Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
   };
 
-  /**
-   * context menu contextuel (copier/coller/lien/image) et raccourci Ctrl+F.
-   * appelée sur chaque BrowserWindow
-   * @param {BrowserWindow} win
-   */
   const enhanceWindow = (win) => {
     const webContents = win.webContents;
 
@@ -162,14 +142,13 @@ if (!gotTheLock) {
       // Flash exempté : on ne remplace pas le menu natif du plugin Flash
       shouldShowMenu: (_event, params) => params.mediaType !== 'plugin',
       showInspectElement: isDev,
-      // bouton custom vers le Wiktionnaire (dictionnaire FR libre), ajouté via prepend plutot que google.
+      // wiktionnaire FR à la place de google
       showSearchWithGoogle: false,
       prepend: (_defaultActions, params) => {
         const selection = (params.selectionText || '').trim();
         if (!selection) {
           return [];
         }
-        // on limite à un mot/expression court pour que ça ait du sens en dico.
         const query = encodeURIComponent(selection);
         return [
           {
@@ -190,7 +169,6 @@ if (!gotTheLock) {
         inspect: 'Inspecter',
         learnSpelling: "Apprendre l'orthographe",
       },
-      // Options custom ajoutées en bas du menu (recharger / zoom)
       append: () => [
         { type: 'separator' },
         { role: 'reload', label: 'Recharger la page' },
@@ -221,16 +199,8 @@ if (!gotTheLock) {
 
   let splashWindow;
   let splashStartTime;
-  // Référence à la fenêtre principale, pour router les deep links dessus (et pas sur le splash,
-  // qui peut être la seule fenêtre existante au moment où un deep link arrive au démarrage).
   let mainWindowRef = null;
 
-  /**
-   * Route une URL de deep link entrante vers la fenêtre principale du launcher.
-   * Toute URL de notre scheme mène au point d'entrée /launcher (qui décide jeu direct
-   * si connecté, sinon écran de connexion). On valide le scheme avant d'agir.
-   * @param {string} url
-   */
   const handleDeepLink = (url) => {
     if (typeof url !== 'string' || !url.startsWith(PROTOCOL_SCHEME + '://')) {
       return;
@@ -242,35 +212,24 @@ if (!gotTheLock) {
       mainWindowRef.restore();
     }
     mainWindowRef.focus();
-    // On repasse par loadStartPage : un deep link ne doit jamais contourner une MAJ obligatoire.
     loadStartPage();
   };
 
-  // Dernier état de mise à jour calculé (partagé avec les handlers IPC de update.html).
   let updateStatus = null;
 
-  /**
-   * Charge le point d'entrée du jeu (/launcher), qui décide auth vs reprise de session.
-   */
   const loadGame = () => {
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
       mainWindowRef.loadURL(GAME_URL.replace(/\/+$/, '') + '/launcher');
     }
   };
 
-  /**
-   * Vérifie la version au démarrage puis charge la bonne page :
-   * - MAJ obligatoire OU optionnelle disponible -> écran de mise à jour (update.html)
-   * - sinon (ou check en échec) -> le jeu directement (on ne bloque jamais sur une erreur réseau)
-   */
   const loadStartPage = async () => {
     if (!mainWindowRef || mainWindowRef.isDestroyed()) {
       return;
     }
     updateStatus = await updater.checkForUpdate(GAME_URL);
 
-    // En cas d'échec du check (réseau, site down), on laisse passer vers le jeu :
-    // mieux vaut un launcher utilisable qu'un blocage sur une erreur transitoire.
+    // échec réseau → on laisse passer, pas de blocage sur une erreur transitoire
     if (updateStatus.ok && updateStatus.updateAvailable) {
       mainWindowRef.loadFile(path.join(__dirname, 'assets/update.html'));
       return;
@@ -372,12 +331,10 @@ if (!gotTheLock) {
 
     mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
       if (isDev) {
-        // en dev : pas de CSP injectée, on laisse passer les headers du serveur tels quels
         callback({ responseHeaders: details.responseHeaders });
         return;
       }
 
-      // CSP stricte en production
       callback({
         responseHeaders: {
           ...details.responseHeaders,
@@ -398,7 +355,7 @@ if (!gotTheLock) {
     });
 
 
-    // bloquer toutes les demandes de permissions (caméra, micro, notifications, etc.)
+    // refuse caméra, micro, notifications, etc.
     mainWindow.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
       callback(false);
     });
@@ -416,10 +373,7 @@ if (!gotTheLock) {
       if (choice === 1) shell.openExternal(url);
     };
 
-    // Une page du jeu mais non autorisée dans le launcher (mon compte, forum…)
-    // s'ouvre directement dans le navigateur par défaut, sans dialog (c'est un
-    // lien légitime du site, juste hors périmètre launcher). Un lien hors domaine
-    // garde la confirmation (sécurité).
+    // lien du site hors périmètre → navigateur sans dialog ; lien externe → dialog de confirmation
     const handleDisallowedUrl = (url) => {
       if (isGameUrl(url)) {
         shell.openExternal(url);
@@ -443,7 +397,7 @@ if (!gotTheLock) {
       event.preventDefault();
       try {
         if (isAllowedInLauncher(url)) {
-          // Page autorisée (console notamment) → nouvelle fenêtre dans le launcher.
+          // page autorisée (ex. console) → nouvelle fenêtre dans le launcher
           const { bounds } = screen.getDisplayMatching(mainWindow.getBounds());
           const newWin = new BrowserWindow({
             width: 1024,
@@ -465,14 +419,12 @@ if (!gotTheLock) {
           enhanceWindow(newWin);
           newWin.loadURL(url);
         } else if (url.startsWith('https://') || url.startsWith('http://')) {
-          // Tout le reste (pages du site hors périmètre, liens externes) → navigateur.
           handleDisallowedUrl(url);
         }
       } catch (e) {
       }
     });
 
-    // Au démarrage : vérifie d'abord la version (écran de MAJ si besoin), sinon charge le jeu.
     loadStartPage();
 
     if (isDev) mainWindow.webContents.openDevTools();
@@ -514,8 +466,7 @@ if (!gotTheLock) {
     app.commandLine.appendSwitch('ppapi-flash-version', '32.0.0.465');
   };
 
-  // Windows/Linux : quand une instance tourne déjà, un nouveau lancement (ex. clic sur
-  // blablastrae-desktop://play) transmet ses arguments ici. On parse le deep link s'il y en a un.
+  // windows/linux : second lancement → deep link dans argv
   app.on('second-instance', (_event, argv) => {
     const deepLink = findDeepLinkInArgv(argv);
     if (deepLink) {
@@ -529,8 +480,7 @@ if (!gotTheLock) {
     }
   });
 
-  // macOS : le deep link n'arrive pas dans argv mais via cet event (peut survenir
-  // avant ou après whenReady). preventDefault pour signaler qu'on le gère nous-mêmes.
+  // macos : deep link via open-url (pas argv), peut arriver avant ou après whenReady
   app.on('open-url', (event, url) => {
     event.preventDefault();
     handleDeepLink(url);
@@ -540,21 +490,15 @@ if (!gotTheLock) {
     if (process.platform !== 'darwin') app.quit();
   });
 
-  // Ouverture d'une URL dans le navigateur par défaut, demandée par le site
-  // (handoff de session : Mon compte / Panel). On valide que l'URL appartient
-  // bien au domaine du jeu avant d'ouvrir, par sécurité.
+  // handoff de session (mon compte, panel) : le site demande au launcher d'ouvrir une URL dans le navigateur
   ipcMain.handle('launcher:open-external', (_event, url) => {
     if (typeof url === 'string' && isGameUrl(url)) {
       shell.openExternal(url);
     }
   });
 
-  // --- Auto-updater : canaux consommés par assets/update.html via le preload ---
-
-  // Renvoie l'état de MAJ calculé au démarrage (versions, obligatoire ou non, type de build).
   ipcMain.handle('updater:get-status', () => updateStatus);
 
-  // Lance la mise à jour. Relaie progression/erreur (cas natif NSIS/AppImage) vers la page.
   ipcMain.handle('updater:start', async () => {
     if (!updateStatus || !updateStatus.ok) {
       return { mode: 'external' };
@@ -574,8 +518,6 @@ if (!gotTheLock) {
     });
   });
 
-  // MAJ optionnelle reportée : on continue vers le jeu. Ignoré si la MAJ est obligatoire
-  // (garde-fou : la page n'affiche pas "plus tard" dans ce cas, mais on double-vérifie ici).
   ipcMain.handle('updater:dismiss-optional', () => {
     if (updateStatus && updateStatus.mandatory) {
       return;
@@ -583,10 +525,8 @@ if (!gotTheLock) {
     loadGame();
   });
 
-  // Enregistre le launcher comme handler du scheme blablastrae-desktop:// auprès de l'OS.
-  // En production l'enregistrement vient surtout de l'installeur (electron-builder), mais cet
-  // appel couvre le mode portable et garantit l'enregistrement au 1er run. Sous Windows en dev
-  // (non packagé), il faut passer execPath + le script pour que l'OS sache quoi relancer.
+  // mode portable et dev (non packagé) : l'installeur ne peut pas enregistrer le scheme, on le fait ici.
+  // windows en dev (process.defaultApp) nécessite execPath + argv[1] pour que l'OS sache quoi relancer.
   if (process.defaultApp && process.argv.length >= 2) {
     app.setAsDefaultProtocolClient(PROTOCOL_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
   } else {
@@ -600,8 +540,7 @@ if (!gotTheLock) {
     createSplashWindow();
     createWindow();
 
-    // Cold start Windows/Linux : si le launcher a été lancé via le protocole (URL dans argv),
-    // on route une fois la fenêtre créée. (Sans deep link, createWindow charge déjà /launcher.)
+    // cold start via protocole (windows/linux) : deep link dans argv au premier lancement
     const initialDeepLink = findDeepLinkInArgv(process.argv);
     if (initialDeepLink) {
       handleDeepLink(initialDeepLink);

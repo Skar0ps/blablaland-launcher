@@ -1,17 +1,10 @@
-// Auto-updater du launcher Blablastrae.
+// source de vérité : GET {GAME_URL}/api/launcher/version -> { latest, minimum }
+// version < minimum  -> MAJ obligatoire (écran bloquant)
+// minimum <= version < latest -> MAJ optionnelle
 //
-// Source de vérité des versions : endpoint Laravel GET {GAME_URL}/api/launcher/version
-//   -> { latest, minimum }
-// Règle :
-//   - version installée < minimum  => mise à jour OBLIGATOIRE (le caller affiche un écran bloquant)
-//   - minimum <= installée < latest => mise à jour optionnelle
-//
-// Flow d'installation selon le type de build (cross-platform) :
-//   - Windows NSIS / Linux AppImage : electron-updater (download in-app + relance auto)
-//   - Windows Portable / macOS DMG  : pas d'auto-update natif fiable -> on ouvre le téléchargement
-//     du bon artefact dans le navigateur (macOS : l'utilisateur refait l'install + script Gatekeeper)
-//
-// Module CommonJS (contrainte launcher), compatible Electron 11.
+// flow selon le build :
+//   NSIS / AppImage -> electron-updater (téléchargement in-app + relance auto)
+//   Portable / macOS -> ouverture du téléchargement dans le navigateur
 
 const { app, shell, net } = require('electron');
 
@@ -19,8 +12,7 @@ const GITHUB_OWNER = 'Skar0ps';
 const GITHUB_REPO = 'blablaland-launcher';
 
 /**
- * Effectue une requête GET JSON via la stack réseau d'Electron (net.request).
- * On n'utilise PAS fetch() : il n'existe pas dans le process main d'Electron 11.
+ * Requête GET JSON via net.request (fetch() n'existe pas dans le process main d'Electron 11).
  * @param {string} url
  * @returns {Promise<object>}
  */
@@ -49,14 +41,11 @@ const fetchJson = (url) => new Promise((resolve, reject) => {
 });
 
 /**
- * Détermine le type de build courant, qui décide du flow de mise à jour.
+ * Détermine le type de build, qui décide du flow de mise à jour.
  * @returns {'portable'|'mac'|'native'}
- *   - 'portable' : build portable Windows (pas d'install, pas d'electron-updater)
- *   - 'mac'      : macOS (signature ad-hoc -> pas d'auto-update Squirrel.Mac fiable)
- *   - 'native'   : NSIS Windows ou AppImage Linux (electron-updater complet)
  */
 const getBuildType = () => {
-  // electron-builder définit PORTABLE_EXECUTABLE_DIR uniquement pour les builds portables Windows.
+  // PORTABLE_EXECUTABLE_DIR est défini par electron-builder uniquement pour les portables Windows
   if (process.env.PORTABLE_EXECUTABLE_DIR !== undefined) {
     return 'portable';
   }
@@ -67,7 +56,7 @@ const getBuildType = () => {
 };
 
 /**
- * Compare deux versions semver simples (ex: "1.8.0").
+ * Compare deux versions semver simples ("1.8.0").
  * @param {string} a
  * @param {string} b
  * @returns {number} <0 si a<b, 0 si égal, >0 si a>b
@@ -88,25 +77,24 @@ const compareVersions = (a, b) => {
 };
 
 /**
- * Construit l'URL GitHub de téléchargement de l'artefact correspondant au build courant.
- * Les noms suivent le schéma de electron-builder.yml (artifactName).
- * @param {string} version  version à télécharger (ex: "1.9.0")
+ * Construit l'URL GitHub de téléchargement pour un build portable ou macOS.
+ * Les noms d'artefacts suivent le schéma défini dans electron-builder.yml.
+ * @param {string} version
  * @param {'portable'|'mac'} buildType
  * @returns {string}
  */
 const buildDownloadUrl = (version, buildType) => {
   const base = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/`;
   if (buildType === 'mac') {
-    // Le zip macOS n'inclut pas la version dans son nom (cf. workflow CI).
+    // le zip macOS n'inclut pas la version dans son nom (cf. workflow CI)
     return base + 'Blablastrae-Launcher-macOS.zip';
   }
-  // Portable Windows.
   return base + `Blablastrae-Launcher-Portable-${version}.exe`;
 };
 
 /**
- * Interroge le site pour connaître les versions latest/minimum et compare à la version installée.
- * @param {string} gameUrl  URL de base du site (sans slash final requis)
+ * Interroge le site pour connaître les versions latest/minimum et les compare à la version installée.
+ * @param {string} gameUrl  URL de base du site
  * @returns {Promise<{
  *   ok: boolean,
  *   currentVersion: string,
@@ -132,15 +120,7 @@ const checkForUpdate = async (gameUrl) => {
     const updateAvailable = compareVersions(currentVersion, latestVersion) < 0;
     const mandatory = compareVersions(currentVersion, minimumVersion) < 0;
 
-    return {
-      ok: true,
-      currentVersion,
-      latestVersion,
-      minimumVersion,
-      updateAvailable,
-      mandatory,
-      buildType,
-    };
+    return { ok: true, currentVersion, latestVersion, minimumVersion, updateAvailable, mandatory, buildType };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, currentVersion, buildType, error: message };
@@ -149,27 +129,24 @@ const checkForUpdate = async (gameUrl) => {
 
 /**
  * Lance la mise à jour selon le type de build.
- * - 'native' : configure et déclenche electron-updater (download + relance auto via quitAndInstall).
- *   Les callbacks de progression/erreur sont relayés au caller pour mettre à jour l'UI.
- * - 'portable'/'mac' : ouvre le téléchargement de l'artefact dans le navigateur par défaut.
+ * - native (NSIS/AppImage) : electron-updater télécharge et relance automatiquement
+ * - portable/mac : ouvre le téléchargement dans le navigateur
  *
  * @param {object} params
- * @param {string} params.latestVersion  version cible (pour construire l'URL portable/mac)
- * @param {(percent:number)=>void} [params.onProgress]  progression 0-100 (native uniquement)
- * @param {(message:string)=>void} [params.onError]     erreur de mise à jour
+ * @param {string} params.latestVersion
+ * @param {(percent: number) => void} [params.onProgress]  progression 0–100 (native uniquement)
+ * @param {(message: string) => void} [params.onError]
  * @returns {Promise<{ mode: 'native'|'external' }>}
  */
 const startUpdate = async ({ latestVersion, onProgress, onError }) => {
   const buildType = getBuildType();
 
   if (buildType !== 'native') {
-    // Portable / macOS : on ne peut pas mettre à jour en place de façon fiable -> téléchargement.
     const url = buildDownloadUrl(latestVersion, buildType);
     await shell.openExternal(url);
     return { mode: 'external' };
   }
 
-  // NSIS Windows / AppImage Linux : electron-updater gère tout.
   const { autoUpdater } = require('electron-updater');
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
@@ -185,23 +162,17 @@ const startUpdate = async ({ latestVersion, onProgress, onError }) => {
   autoUpdater.removeAllListeners('update-downloaded');
 
   autoUpdater.on('download-progress', (progress) => {
-    if (onProgress) {
-      onProgress(Math.round(progress.percent));
-    }
+    if (onProgress) onProgress(Math.round(progress.percent));
   });
 
   autoUpdater.on('error', (error) => {
-    if (onError) {
-      onError(error instanceof Error ? error.message : String(error));
-    }
+    if (onError) onError(error instanceof Error ? error.message : String(error));
   });
 
-  // Une fois le téléchargement terminé : quitte et relance sur la nouvelle version.
   autoUpdater.on('update-downloaded', () => {
     autoUpdater.quitAndInstall();
   });
 
-  // checkForUpdates remplit la cible interne puis on lance le download nous-mêmes.
   await autoUpdater.checkForUpdates();
   await autoUpdater.downloadUpdate();
 
